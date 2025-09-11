@@ -20,6 +20,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = ">=3.11"
+typer = ">=0.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2"
@@ -29,6 +30,9 @@ pre-commit = "^3.7"
 [build-system]
 requires = ["poetry-core>=1.7.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+cogmyra = "cogmyra.cli:app"
 
 [tool.ruff]
 line-length = 100
