@@ -1,3 +1,5 @@
+![CI](https://github.com/CogMyra/cogmyra/actions/workflows/ci.yml/badge.svg)
+
 # CogMyra
 
 AI-powered personalized learning platform.
