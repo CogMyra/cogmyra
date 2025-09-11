@@ -5,24 +5,26 @@ on:
     types: [published]
 
 permissions:
-  id-token: write
   contents: read
+  id-token: write  # needed for Trusted Publisher (OIDC)
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Build package
+      - name: Build sdist & wheel
         run: |
-          pip install build
+          python -m pip install --upgrade pip build
           python -m build
 
-      - name: Publish to TestPyPI (Trusted Publisher)
+      - name: Publish to TestPyPI (OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
