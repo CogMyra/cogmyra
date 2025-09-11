@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cogmyra"
-version = "0.2.0"
+version = "0.2.5"
 description = "AI-powered personalized learning platform"
 authors = ["CogMyra Team <dev@cogmyra.example>"]
 license = "MIT"
