@@ -54,3 +54,12 @@ cogmyra greet World
 
 
 ```
+## Install from TestPyPI
+
+```bash
+python -m pip install \
+  --index-url https://test.pypi.org/simple \
+  --extra-index-url https://pypi.org/simple \
+  cogmyra==0.2.5
+
+```
