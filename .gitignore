@@ -71,3 +71,4 @@ poetry.lock
 *.env
 *.log
 
+.env.local
