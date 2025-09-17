@@ -1,27 +1,31 @@
 [tool.poetry]
 name = "cogmyra"
 version = "0.3.5"
-description = "CogMyra local API (FastAPI + OpenAI) with simple logging"
-authors = ["CogMyra <dev@cogmyra.com>"]
-# If you later add a real Python package, list it here.
-packages = []
+description = "CogMyra local API (FastAPI + OpenAI) for chat + logging"
+authors = ["CogMyra"]
+package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.14"
-fastapi = "0.111.1"
-uvicorn = "0.30.6"
-python-dotenv = "^1.0.1"
-sqlalchemy = "^2.0.34"
-pydantic = "^2.8.2"
-openai = "^1.40.0"
-python-multipart = "^0.0.20"
-jinja2 = "^3.1.6"
+python = "^3.11"
 
-# Dev-only tools (NOT installed on Render when we use --without dev)
+# runtime deps only (safe for Render)
+fastapi = "^0.111.1"
+uvicorn = "^0.30.6"          # no extras -> avoids watchfiles
+python-dotenv = "^1.0.1"
+pydantic = "^2.8.2"
+sqlalchemy = "^2.0.32"
+openai = "^1.44.0"
+email-validator = "^2.3.0"
+
+# ── dev-only deps (WILL NOT be installed on Render) ────────────────────────────
 [tool.poetry.group.dev.dependencies]
-fastapi-cli = "^0.0.12"
 ruff = "^0.5.7"
+fastapi-cli = "^0.0.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
 
 [build-system]
-requires = ["poetry-core>=1.8.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
