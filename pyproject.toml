@@ -19,7 +19,7 @@ jinja2 = "^3.1.6"
 
 # Dev-only tools (NOT installed on Render when we use --without dev)
 [tool.poetry.group.dev.dependencies]
-fastapi-cli = "^0.12"
+fastapi-cli = "^0.0.12"
 ruff = "^0.5.7"
 
 [build-system]
