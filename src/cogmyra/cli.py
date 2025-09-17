@@ -51,7 +51,9 @@ def mem_add(
 def mem_last(
     user: Optional[str] = typer.Option(None, "--user", help="Filter by user id"),
     n: int = typer.Option(5, "--n", min=1, help="Number of entries to show"),
-    file: Optional[Path] = typer.Option(None, "--file", help="Optional JSONL file path"),
+    file: Optional[Path] = typer.Option(
+        None, "--file", help="Optional JSONL file path"
+    ),
 ) -> None:
     """Show the last N entries (most recent first)."""
 
@@ -66,7 +68,9 @@ def mem_last(
 def mem_search(
     query: str = typer.Argument(..., help="Substring to search for (case-insensitive)"),
     user: Optional[str] = typer.Option(None, "--user", help="Filter by user id"),
-    file: Optional[Path] = typer.Option(None, "--file", help="Optional JSONL file path"),
+    file: Optional[Path] = typer.Option(
+        None, "--file", help="Optional JSONL file path"
+    ),
 ) -> None:
     """Search entries for QUERY and print matches (most recent first)."""
 
