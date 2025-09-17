@@ -58,7 +58,9 @@ class MemoryStore:
             # Best-effort load; ignore if file missing.
             self.load()
 
-    def add(self, user_id: str, text: str, metadata: dict[str, Any] | None = None) -> MemoryEntry:
+    def add(
+        self, user_id: str, text: str, metadata: dict[str, Any] | None = None
+    ) -> MemoryEntry:
         """Add a new memory entry to the store.
 
         Args:
@@ -70,7 +72,9 @@ class MemoryStore:
             The created :class:`MemoryEntry` instance.
         """
 
-        entry = MemoryEntry(timestamp=time.time(), user_id=user_id, text=text, metadata=metadata)
+        entry = MemoryEntry(
+            timestamp=time.time(), user_id=user_id, text=text, metadata=metadata
+        )
         with self._lock:
             self._entries.append(entry)
         return entry
@@ -87,7 +91,9 @@ class MemoryStore:
         """
 
         with self._lock:
-            filtered = [e for e in self._entries if user_id is None or e.user_id == user_id]
+            filtered = [
+                e for e in self._entries if user_id is None or e.user_id == user_id
+            ]
             return list(reversed(filtered))[:n]
 
     def search(self, query: str, user_id: str | None = None) -> list[MemoryEntry]:
@@ -106,7 +112,9 @@ class MemoryStore:
 
         needle = query.casefold()
         with self._lock:
-            candidates = [e for e in self._entries if user_id is None or e.user_id == user_id]
+            candidates = [
+                e for e in self._entries if user_id is None or e.user_id == user_id
+            ]
             matches = [e for e in candidates if needle in e.text.casefold()]
             return list(reversed(matches))
 
@@ -189,7 +197,9 @@ class MemoryStore:
                         continue
                     seen.add(key)
                     loaded.append(
-                        MemoryEntry(timestamp=ts, user_id=uid, text=text, metadata=metadata)
+                        MemoryEntry(
+                            timestamp=ts, user_id=uid, text=text, metadata=metadata
+                        )
                     )
         finally:
             # Replace in one shot under lock to avoid partial reads by other threads
