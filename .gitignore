@@ -72,3 +72,4 @@ poetry.lock
 *.log
 
 .env.local
+*.save

@@ -1,39 +1,15 @@
-#!/usr/bin/env python3
-"""
-rotate_secrets.py
-
-Tiny helper to (re)write key=value pairs into a .env-style file
-without duplicating lines, and always ending with a newline.
-"""
-
 from __future__ import annotations
 
+import secrets
+from datetime import datetime
 from pathlib import Path
 
 
-def set_env_kv(path: Path, key: str, value: str) -> None:
-    """
-    Upsert KEY=VALUE into a .env-like file.
-    - Replaces the existing line if KEY=... already exists.
-    - Appends a new line otherwise.
-    - Ensures the file ends with a trailing newline.
-    """
+def set_kv(path: Path, key: str, value: str) -> None:
+    """Set or replace KEY=VALUE in a .env-style file, preserving a trailing newline."""
     text = path.read_text() if path.exists() else ""
-    lines = text.splitlines()
-    found = False
-
-    for i, line in enumerate(lines):
-        # ignore comments and blank lines when matching
-        if not line or line.lstrip().startswith("#"):
-            continue
-        if line.split("=", 1)[0].strip() == key:
-            lines[i] = f"{key}={value}"
-            found = True
-            break
-
-    if not found:
-        lines.append(f"{key}={value}")
-
+    lines = [ln for ln in text.splitlines() if not ln.startswith(f"{key}=")]
+    lines.append(f"{key}={value}")
     out = "\n".join(lines)
     if not out.endswith("\n"):
         out += "\n"
@@ -41,27 +17,26 @@ def set_env_kv(path: Path, key: str, value: str) -> None:
 
 
 def main() -> None:
-    """
-    Example usage:
-      - Update web .env.local (Vite)
-      - Update server .env.local (FastAPI)
+    """Example rotation for local dev. Adjust keys/paths as needed."""
+    api_env = Path.home() / "cogmyra-dev" / ".env.local"
+    web_env = Path.home() / "cogmyra-dev9" / ".env.local"
 
-    Adjust paths/keys as needed for your workflow, or call set_env_kv
-    from another script.
-    """
-    repo = Path(__file__).resolve().parents[1]
-    web_env = repo / "cogmyra-dev9" / ".env.local"
-    api_env = repo / ".env.local"
+    # Generate new secrets
+    new_admin = secrets.token_urlsafe(16)
+    new_beta = secrets.token_urlsafe(16)
 
-    # No-op examples (uncomment and set values if you want to use this script directly):
-    # set_env_kv(web_env, "VITE_BETA_PASSWORD", "REDACTED")
-    # set_env_kv(web_env, "VITE_API_BASE", "http://localhost:8001")
-    # set_env_kv(api_env, "ADMIN_PASSWORD", "REDACTED")
-    # set_env_kv(api_env, "OPENAI_API_KEY", "sk-...")
+    # Write (create files if missing)
+    set_kv(api_env, "ADMIN_PASSWORD", new_admin)
+    set_kv(web_env, "VITE_BETA_PASSWORD", new_beta)
 
-    # print paths so CI/logs show what we touched
-    print(f"OK: script ready. Web env: {web_env}")
-    print(f"OK: script ready. API env: {api_env}")
+    # Write a minimal report without the secrets themselves
+    report = Path.home() / "Desktop" / f"CogMyra_Secrets_{datetime.now():%Y-%m-%d}.txt"
+    report.write_text(
+        "Secrets rotated locally.\n"
+        f"- {api_env}\n"
+        f"- {web_env}\n"
+        "Values are intentionally NOT included in this report.\n"
+    )
 
 
 if __name__ == "__main__":
