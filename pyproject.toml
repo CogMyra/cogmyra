@@ -1,22 +1,24 @@
 [tool.poetry]
 name = "cogmyra"
 version = "0.3.5"
-description = "CogMyra API"
-authors = ["CogMyra <dev@cogmyra.com>"]
-# keep this simple: we're not publishing a package
-package-mode = false
+description = "CogMyra local API"
+authors = ["Michael Angotti <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "server" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.111.1"
 uvicorn = "^0.30.6"
+openai = "^1.51.0"
+SQLAlchemy = "^2.0.35"
+python-dotenv = "^1.0.1"
 
-# dev-only tools (NOT installed on Render due to --without dev)
 [tool.poetry.group.dev.dependencies]
 fastapi-cli = "^0.0.12"
 ruff = "^0.5.7"
 watchfiles = "^0.21.0"
 
 [build-system]
-requires = ["poetry-core>=1.8.0"]
+requires = ["poetry-core>=1.9.0"]
 build-backend = "poetry.core.masonry.api"
