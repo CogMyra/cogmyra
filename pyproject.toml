@@ -1,31 +1,22 @@
 [tool.poetry]
 name = "cogmyra"
 version = "0.3.5"
-description = "CogMyra local API (FastAPI + OpenAI) for chat + logging"
-authors = ["CogMyra"]
+description = "CogMyra API"
+authors = ["CogMyra <dev@cogmyra.com>"]
+# keep this simple: we're not publishing a package
 package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
-
-# runtime deps only (safe for Render)
 fastapi = "^0.111.1"
-uvicorn = "^0.30.6"          # no extras -> avoids watchfiles
-python-dotenv = "^1.0.1"
-pydantic = "^2.8.2"
-sqlalchemy = "^2.0.32"
-openai = "^1.44.0"
-email-validator = "^2.3.0"
+uvicorn = "^0.30.6"
 
-# ── dev-only deps (WILL NOT be installed on Render) ────────────────────────────
+# dev-only tools (NOT installed on Render due to --without dev)
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.5.7"
 fastapi-cli = "^0.0.12"
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
+ruff = "^0.5.7"
+watchfiles = "^0.21.0"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"
