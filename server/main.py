@@ -1,40 +1,38 @@
-from __future__ import annotations
-
-import os
-from typing import List
-
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+import io
+import csv
+import os
 
+app = FastAPI()
 
-# ---------------------------
-# FastAPI app + CORS
-# ---------------------------
-app = FastAPI(title="CogMyra API")
-
-ALLOWED_ORIGINS = [
+# CORS setup
+origins = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://localhost:5176",
+    "http://localhost:5177",
+    "http://localhost:5178",
+    "http://localhost:5179",
+    "http://localhost:5180",
+    "http://localhost:5181",
     "http://localhost:5185",
-    "http://localhost:5186",
-    "https://cogmyra-api.onrender.com",
-    "*",
+    "https://cogmyra-web.onrender.com",  # <-- Replace with your actual Render Static Site URL
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],  # includes x-admin-key, Content-Type, etc.
+    allow_headers=["*"],
 )
 
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
-
-# ---------------------------
-# Models
-# ---------------------------
+# Simple models
 class Message(BaseModel):
     role: str
     content: str
@@ -42,74 +40,61 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     session_id: str
-    messages: List[Message]
+    messages: list[Message]
 
 
-class ChatResponse(BaseModel):
-    reply: str
-
-
-# ---------------------------
-# Routes
-# ---------------------------
+# Health check
 @app.get("/api/health")
 async def health():
     return {"ok": True}
 
 
-# --- Admin: support GET and POST for convenience ---
-async def _check_admin(request: Request) -> None:
-    key = request.headers.get("x-admin-key", "")
-    if not ADMIN_PASSWORD or key != ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+# Chat endpoint (POST)
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
+    last_message = req.messages[-1].content if req.messages else ""
+    if last_message.lower() == "ping":
+        return {"reply": "Pong! How can I assist you today?"}
+    return {"reply": f"You said: {last_message}"}
+
+
+# Admin key from env or hardcoded
+ADMIN_KEY = os.getenv("ADMIN_PASSWORD", "walnut-salsa-meteor-88")
 
 
 @app.get("/api/admin/stats")
-async def admin_stats_get(request: Request):
-    await _check_admin(request)
+async def admin_stats(request: Request):
+    key = request.headers.get("x-admin-key")
+    if key != ADMIN_KEY:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+    # Dummy stats for now
     return {
-        "total_rows": 6,
-        "unique_sessions": 3,
-        "last_entry_at": "2025-09-16T22:29:54.931190",
+        "total_rows": 8,
+        "unique_sessions": 4,
+        "last_entry_at": "2025-09-20T01:14:31.112921",
     }
 
 
-@app.post("/api/admin/stats")
-async def admin_stats_post(request: Request):
-    return await admin_stats_get(request)
-
-
 @app.get("/api/admin/export.csv")
-async def admin_export_get(request: Request):
-    await _check_admin(request)
-    # Placeholder CSV; swap in real data later
-    csv = (
-        "id,session_id,role,created_at,content\n"
-        "1,web-test,user,2025-09-18T00:00:00Z,Hello\n"
-        "2,web-test,assistant,2025-09-18T00:00:01Z,Hi there!\n"
+async def admin_export(request: Request):
+    key = request.headers.get("x-admin-key")
+    if key != ADMIN_KEY:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    # Fake data — replace with your DB queries later
+    rows = [
+        ["id", "session_id", "role", "created_at", "content"],
+        [1, "demo", "user", "2025-09-16 22:11:04", "Say hello in five words."],
+        [2, "demo", "assistant", "2025-09-16 22:11:05", "Hello there! How are you?"],
+    ]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerows(rows)
+    buf.seek(0)
+
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=export.csv"},
     )
-    return Response(content=csv, media_type="text/csv")
-
-
-@app.post("/api/admin/export.csv")
-async def admin_export_post(request: Request):
-    return await admin_export_get(request)
-
-
-# --- Chat: POST (primary) + a simple GET for smoke tests ---
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
-    last_user = next(
-        (m.content for m in reversed(req.messages) if m.role == "user"), ""
-    )
-    reply = (
-        "Hello! I'm alive on Render and received your message"
-        + (f": “{last_user}”." if last_user else ".")
-        + " (This is an echo placeholder—you can swap in OpenAI next.)"
-    )
-    return {"reply": reply}
-
-
-@app.get("/api/chat", response_model=ChatResponse)
-async def chat_get(session_id: str = "browser", content: str = "Ping"):
-    return {"reply": f"Pong (GET)! You said: {content}"}
