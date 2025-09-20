@@ -1,77 +1,74 @@
 import os
+import uuid
 import csv
 from io import StringIO
 from datetime import datetime
 from typing import List
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from openai import OpenAI
 
-# --- Config ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-ADMIN_KEY = os.getenv("ADMIN_KEY", "changeme")
+# -------------------------------------------------------------------
+# Environment
+# -------------------------------------------------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 CORS_ALLOWED = (
     os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
     if os.getenv("CORS_ALLOWED_ORIGINS")
-    else ["*"]
+    else []
 )
 
-# --- App ---
+# -------------------------------------------------------------------
+# App setup
+# -------------------------------------------------------------------
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ALLOWED,
+    allow_origins=CORS_ALLOWED or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# --- In-memory log ---
-class LogEntry(BaseModel):
-    id: int
-    session_id: str
-    role: str
-    created_at: datetime
-    content: str
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-_LOG: List[LogEntry] = []
-_NEXT_ID = 1
-
-
-def log_message(session_id: str, role: str, content: str):
-    global _NEXT_ID
-    entry = LogEntry(
-        id=_NEXT_ID,
-        session_id=session_id,
-        role=role,
-        created_at=datetime.utcnow(),
-        content=content,
-    )
-    _LOG.append(entry)
-    _NEXT_ID += 1
-
-
-# --- Schemas ---
-class ChatMessage(BaseModel):
+# -------------------------------------------------------------------
+# Models
+# -------------------------------------------------------------------
+class Message(BaseModel):
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
     session_id: str
-    messages: List[ChatMessage]
+    messages: List[Message]
 
 
 class ChatResponse(BaseModel):
     reply: str
 
 
-# --- Routes ---
+class LogRow(BaseModel):
+    id: str
+    session_id: str
+    role: str
+    created_at: datetime
+    content: str
+
+
+_LOG: List[LogRow] = []
+
+
+# -------------------------------------------------------------------
+# Routes
+# -------------------------------------------------------------------
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -79,60 +76,44 @@ def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
-    log_message(
-        req.session_id, "user", req.messages[-1].content if req.messages else ""
-    )
-
     if not OPENAI_API_KEY:
-        reply = f"(Temporary fallback) You said: {req.messages[-1].content if req.messages else ''}"
-    else:
-        try:
-            client = OpenAI(api_key=OPENAI_API_KEY)
-            completion = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": m.role, "content": m.content} for m in req.messages],
-                max_tokens=200,
+        raise HTTPException(status_code=500, detail="No OpenAI key configured")
+
+    # Log incoming messages
+    for m in req.messages:
+        _LOG.append(
+            LogRow(
+                id=str(uuid.uuid4()),
+                session_id=req.session_id,
+                role=m.role,
+                created_at=datetime.utcnow(),
+                content=m.content,
             )
-            reply = completion.choices[0].message.content
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        )
 
-    log_message(req.session_id, "assistant", reply)
-    return ChatResponse(reply=reply)
+    # Call OpenAI
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[m.dict() for m in req.messages],
+            max_tokens=200,
+        )
+        reply = resp.choices[0].message.content
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI error: {e}")
 
-
-@app.get("/api/admin/stats")
-def admin_stats(request: Request):
-    key = request.headers.get("x-admin-key")
-    if key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    return {
-        "total_rows": len(_LOG),
-        "unique_sessions": len(set(r.session_id for r in _LOG)),
-        "last_entry_at": _LOG[-1].created_at.isoformat() if _LOG else None,
-    }
-
-
-@app.get("/api/admin/logs")
-def admin_logs(request: Request):
-    key = request.headers.get("x-admin-key")
-    if key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    def _gen():
-        for r in _LOG:
-            buf = StringIO()
-            writer = csv.writer(buf)
-            writer.writerow(
-                [r.id, r.session_id, r.role, r.created_at.isoformat(), r.content]
-            )
-            yield buf.getvalue()
-
-    return Response(
-        content="".join(list(_gen())),
-        media_type="text/csv; charset=utf-8",
+    # Log assistant reply
+    _LOG.append(
+        LogRow(
+            id=str(uuid.uuid4()),
+            session_id=req.session_id,
+            role="assistant",
+            created_at=datetime.utcnow(),
+            content=reply,
+        )
     )
+
+    return ChatResponse(reply=reply)
 
 
 @app.get("/api/diag")
@@ -141,3 +122,54 @@ def diag():
         "has_openai_key": bool(OPENAI_API_KEY),
         "origins": CORS_ALLOWED or ["*"],
     }
+
+
+@app.get("/api/admin/stats")
+def admin_stats(x_admin_key: str = Header("")):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return {
+        "total_rows": len(_LOG),
+        "unique_sessions": len({r.session_id for r in _LOG}),
+        "last_entry_at": _LOG[-1].created_at.isoformat() if _LOG else None,
+    }
+
+
+def _csv_stream():
+    # header
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "session_id", "role", "created_at", "content"])
+    yield buf.getvalue()
+    # rows
+    for r in _LOG:
+        buf = StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(
+            [r.id, r.session_id, r.role, r.created_at.isoformat(), r.content]
+        )
+        yield buf.getvalue()
+
+
+# Primary CSV endpoint (no extension)
+@app.get("/api/admin/export")
+def admin_export(x_admin_key: str = Header("")):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return StreamingResponse(
+        _csv_stream(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=logs.csv"},
+    )
+
+
+# Alias to match the web UI button calling `/api/admin/export.csv`
+@app.get("/api/admin/export.csv")
+def admin_export_csv(x_admin_key: str = Header("")):
+    if x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return StreamingResponse(
+        _csv_stream(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=logs.csv"},
+    )
