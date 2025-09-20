@@ -1,100 +1,53 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from typing import List
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
-import io
-import csv
 import os
 
-app = FastAPI()
+# If these aren't already in your file, keep them. If they are, don't duplicate.
+from openai import OpenAI
 
-# CORS setup
-origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5176",
-    "http://localhost:5177",
-    "http://localhost:5178",
-    "http://localhost:5179",
-    "http://localhost:5180",
-    "http://localhost:5181",
-    "http://localhost:5185",
-    "https://cogmyra-web.onrender.com",  # <-- Replace with your actual Render Static Site URL
-]
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter()
 
 
-# Simple models
-class Message(BaseModel):
+class ChatMessage(BaseModel):
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
     session_id: str
-    messages: list[Message]
+    messages: List[ChatMessage]
 
 
-# Health check
-@app.get("/api/health")
-async def health():
-    return {"ok": True}
+class ChatResponse(BaseModel):
+    reply: str
 
 
-# Chat endpoint (POST)
-@app.post("/api/chat")
-async def chat(req: ChatRequest):
-    last_message = req.messages[-1].content if req.messages else ""
-    if last_message.lower() == "ping":
-        return {"reply": "Pong! How can I assist you today?"}
-    return {"reply": f"You said: {last_message}"}
+@router.post("/api/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest, request: Request):
+    """
+    OpenAI-backed chat. Returns assistant text content.
+    """
+    if not os.getenv("OPENAI_API_KEY"):
+        # Hard fail if key missing (so we don't silently echo again)
+        raise HTTPException(
+            status_code=500, detail="OPENAI_API_KEY is not set on the server."
+        )
 
-
-# Admin key from env or hardcoded
-ADMIN_KEY = os.getenv("ADMIN_PASSWORD", "walnut-salsa-meteor-88")
-
-
-@app.get("/api/admin/stats")
-async def admin_stats(request: Request):
-    key = request.headers.get("x-admin-key")
-    if key != ADMIN_KEY:
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-    # Dummy stats for now
-    return {
-        "total_rows": 8,
-        "unique_sessions": 4,
-        "last_entry_at": "2025-09-20T01:14:31.112921",
-    }
-
-
-@app.get("/api/admin/export.csv")
-async def admin_export(request: Request):
-    key = request.headers.get("x-admin-key")
-    if key != ADMIN_KEY:
-        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-
-    # Fake data — replace with your DB queries later
-    rows = [
-        ["id", "session_id", "role", "created_at", "content"],
-        [1, "demo", "user", "2025-09-16 22:11:04", "Say hello in five words."],
-        [2, "demo", "assistant", "2025-09-16 22:11:05", "Hello there! How are you?"],
-    ]
-
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerows(rows)
-    buf.seek(0)
-
-    return StreamingResponse(
-        iter([buf.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=export.csv"},
-    )
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": m.role, "content": m.content} for m in req.messages],
+            max_tokens=300,
+            temperature=0.7,
+        )
+        reply = completion.choices[0].message.content or ""
+        reply = reply.strip()
+        if not reply:
+            reply = "I'm here and ready to help!"
+        return ChatResponse(reply=reply)
+    except Exception as e:
+        # Surface a clear server error so the UI shows “Load failed” instead of echoing.
+        raise HTTPException(status_code=502, detail=f"OpenAI call failed: {e}")
