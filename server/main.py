@@ -1,37 +1,64 @@
-# FastAPI app for CogMyra – chat proxy + logging + admin
 from __future__ import annotations
 
 import csv
 import os
 from datetime import datetime
 from io import StringIO
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, StreamingResponse
 from openai import OpenAI
+from pydantic import BaseModel
 
-# ---- Env ----
+
+# -----------------------------
+# Config (env-driven)
+# -----------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-ADMIN_KEY = os.getenv("ADMIN_KEY", "")
-CORS_ALLOWED = os.getenv("CORS_ALLOWED_ORIGINS", "")
-ALLOWED_ORIGINS = [o.strip() for o in CORS_ALLOWED.split(",") if o.strip()] or ["*"]
+ADMIN_KEY = os.getenv("ADMIN_KEY", "walnut-salsa-meteor-88")
 
-# ---- App ----
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Comma-separated list of allowed origins, or single origin
+_CORS = os.getenv("CORS_ALLOWED_ORIGINS", "").strip()
+CORS_ALLOWED: list[str] = (
+    [o.strip() for o in _CORS.split(",") if o.strip()] if _CORS else []
 )
 
 
-# ---- Models ----
+# -----------------------------
+# App
+# -----------------------------
+app = FastAPI(title="CogMyra API", version="0.3.5")
+
+# CORS
+if CORS_ALLOWED:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ALLOWED,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Default to permissive if unset (useful for local dev)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+# -----------------------------
+# Models
+# -----------------------------
+Role = Literal["user", "assistant", "system"]
+
+
 class Message(BaseModel):
-    role: str
+    role: Role
     content: str
 
 
@@ -47,126 +74,137 @@ class ChatResponse(BaseModel):
 class LogRow(BaseModel):
     id: int
     session_id: str
-    role: str
-    content: str
+    role: Role
     created_at: datetime
+    content: str
 
 
-# ---- In-memory log ----
-_LOG: List[LogRow] = []
-_COUNTER = 0
+# -----------------------------
+# Simple in-memory log store
+# -----------------------------
+_LOG: list[LogRow] = []
+_NEXT_ID = 1
 
 
-def _append_log(session_id: str, role: str, content: str) -> None:
-    global _COUNTER
-    _COUNTER += 1
+def _append_log(session_id: str, role: Role, content: str) -> None:
+    global _NEXT_ID
     _LOG.append(
         LogRow(
-            id=_COUNTER,
+            id=_NEXT_ID,
             session_id=session_id,
             role=role,
-            content=content,
             created_at=datetime.utcnow(),
+            content=content,
         )
     )
+    _NEXT_ID += 1
 
 
 def _require_admin(x_admin_key: Optional[str]) -> None:
-    if not ADMIN_KEY or x_admin_key != ADMIN_KEY:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    if not x_admin_key or x_admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-# ---- Health / Diag ----
+# -----------------------------
+# Routes
+# -----------------------------
 @app.get("/api/health")
-def health():
+def health() -> dict:
     return {"ok": True}
 
 
 @app.get("/api/diag")
-def diag():
-    return {"has_openai_key": bool(OPENAI_API_KEY), "origins": ALLOWED_ORIGINS}
+def diag() -> dict:
+    return {
+        "has_openai_key": bool(OPENAI_API_KEY),
+        "origins": CORS_ALLOWED or ["*"],
+    }
 
 
-# ---- Chat ----
 @app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest, request: Request):
-    user_text = (req.messages[-1].content if req.messages else "").strip()
-    _append_log(req.session_id, "user", user_text)
+def chat(req: ChatRequest) -> ChatResponse:
+    """OpenAI-backed chat; logs both user prompt and assistant reply."""
+    _append_log(
+        req.session_id, "user", req.messages[-1].content if req.messages else ""
+    )
 
+    # If no key, fail clearly (prevents silent echo responses)
     if not OPENAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing OpenAI API key")
+        raise HTTPException(
+            status_code=500, detail="OPENAI_API_KEY is not configured on the server."
+        )
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
 
     try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        # Map incoming messages directly; ensure there is at least one system primer
+        messages_payload = (
+            [{"role": "system", "content": "You are a concise, helpful assistant."}]
+            + [m.model_dump() for m in req.messages]
+            if req.messages and req.messages[0].role != "system"
+            else [m.model_dump() for m in req.messages]
+        )
+
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a concise, friendly assistant."},
-                {"role": "user", "content": user_text or "Say hello."},
-            ],
+            messages=messages_payload,
             temperature=0.7,
-            max_tokens=120,
+            max_tokens=200,
         )
         reply = resp.choices[0].message.content or "…"
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Model error: {e!r}")
+        # Surface model errors, but keep API shape stable
+        raise HTTPException(status_code=502, detail=f"OpenAI error: {e!s}") from e
 
     _append_log(req.session_id, "assistant", reply)
     return ChatResponse(reply=reply)
 
 
-# ---- Admin: stats ----
 @app.get("/api/admin/stats")
-def admin_stats(x_admin_key: Optional[str] = Header(None)):
+def admin_stats(
+    x_admin_key: Optional[str] = Header(default=None, convert_underscores=False),
+) -> dict:
+    """Simple counters for sanity checks."""
     _require_admin(x_admin_key)
-    total = len(_LOG)
-    sessions = {r.session_id for r in _LOG}
-    last = _LOG[-1].created_at.isoformat() if _LOG else None
+    total_rows = len(_LOG)
+    sessions = sorted({row.session_id for row in _LOG})
+    last_entry_at = _LOG[-1].created_at.isoformat() if _LOG else None
     return {
-        "total_rows": total,
+        "total_rows": total_rows,
         "unique_sessions": len(sessions),
-        "last_entry_at": last,
+        "last_entry_at": last_entry_at,
     }
 
 
-# ---- Admin: export CSV ----
+@app.get("/api/admin/logs")
+def admin_logs(
+    x_admin_key: Optional[str] = Header(default=None, convert_underscores=False),
+) -> JSONResponse:
+    """Return the full log as JSON list of rows."""
+    _require_admin(x_admin_key)
+    return JSONResponse([row.model_dump() for row in _LOG])
+
+
 @app.get("/api/admin/export.csv")
-@app.get("/api/admin/export")
-def admin_export_csv(x_admin_key: Optional[str] = Header(None)):
+def admin_export_csv(
+    x_admin_key: Optional[str] = Header(default=None, convert_underscores=False),
+) -> StreamingResponse:
+    """Stream the log as CSV; safe for large outputs."""
     _require_admin(x_admin_key)
 
     def _gen():
-        header = ["id", "session_id", "role", "created_at", "content"]
-        buf = StringIO()
-        csv.writer(buf).writerow(header)
-        yield buf.getvalue()
+        # header
+        yield "id,session_id,role,created_at,content\n"
+        # rows
         for r in _LOG:
             buf = StringIO()
-            csv.writer(buf).writerow(
+            writer = csv.writer(buf)
+            writer.writerow(
                 [r.id, r.session_id, r.role, r.created_at.isoformat(), r.content]
             )
             yield buf.getvalue()
 
-    csv_text = "".join(list(_gen()))
     headers = {"Content-Disposition": 'attachment; filename="logs.csv"'}
-    return Response(
-        content=csv_text, media_type="text/csv; charset=utf-8", headers=headers
+    return StreamingResponse(
+        _gen(), media_type="text/csv; charset=utf-8", headers=headers
     )
-
-
-# ---- Admin: recent logs (JSON) ----
-@app.get("/api/admin/logs")
-def admin_logs(limit: int = 50, x_admin_key: Optional[str] = Header(None)):
-    _require_admin(x_admin_key)
-    limit = max(1, min(500, limit))
-    rows = list(reversed(_LOG[-limit:]))
-    return [
-        {
-            "id": r.id,
-            "time": r.created_at.isoformat(timespec="seconds"),
-            "session": r.session_id,
-            "role": r.role,
-            "content": r.content,
-        }
-        for r in rows
-    ]
