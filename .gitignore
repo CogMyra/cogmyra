@@ -73,3 +73,7 @@ poetry.lock
 
 .env.local
 *.save
+
+# local exports
+export.csv
+exports/
