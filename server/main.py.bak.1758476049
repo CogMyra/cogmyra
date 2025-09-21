@@ -1,0 +1,47 @@
+# === Admin auth (header + env) ================================================
+import os
+import hashlib
+from fastapi import Depends, Header, HTTPException, Query, Response
+
+# read once at import
+_ADMIN_KEY_RAW = os.getenv("ADMIN_KEY", "")
+
+def _matches_admin_key(candidate: str | None) -> bool:
+    if not candidate or not _ADMIN_KEY_RAW:
+        return False
+    return candidate == _ADMIN_KEY_RAW
+
+def _extract_admin_from_authz(authz: str | None) -> str | None:
+    if not authz:
+        return None
+    parts = authz.split(None, 1)
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
+
+async def require_admin(
+    x_admin_key: str | None = Header(default=None, alias="x-admin-key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> None:
+    token = x_admin_key or _extract_admin_from_authz(authorization)
+    if not _matches_admin_key(token):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+# === Admin export route (protected) ===========================================
+@app.get("/api/admin/export.csv", dependencies=[Depends(require_admin)])
+def admin_export_csv(limit: int = Query(1000, ge=1, le=10000)) -> Response:
+    """
+    Return logs as CSV (keep your existing implementation — just ensure this
+    function signature and dependency remain). Replace the dummy CSV below.
+    """
+    # TODO: replace with your real CSV bytes
+    csv_bytes = b"id,session_id,role,created_at,content\n"
+    return Response(content=csv_bytes, media_type="text/csv")
+
+# === TEMP debug (enable with DEBUG_ADMIN=1) ===================================
+@app.get("/api/_debug/admin-key-hash")
+def _debug_admin_key_hash():
+    if os.getenv("DEBUG_ADMIN") != "1":
+        raise HTTPException(status_code=404, detail="Not Found")
+    h = hashlib.sha256(_ADMIN_KEY_RAW.encode()).hexdigest() if _ADMIN_KEY_RAW else None
+    return {"server_hash": h, "key_len": len(_ADMIN_KEY_RAW) if _ADMIN_KEY_RAW else 0}
