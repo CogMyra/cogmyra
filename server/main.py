@@ -8,8 +8,22 @@ import os
 from typing import Iterable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, Request
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware import Middleware
 
-app = FastAPI(title="CogMyra API")
+# === CORS (attach at app creation to guarantee it is active) ==================
+ALLOWED_ORIGINS = ["https://cogmyra-web.onrender.com"]
+middleware = [
+    Middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
+
+app = FastAPI(title="CogMyra API", middleware=middleware)
 
 # === Admin key handling =======================================================
 # Read once at process start. On Render, set either ADMIN_KEY or COGMYRA_ADMIN_KEY.
@@ -39,7 +53,6 @@ async def require_admin(
     x_admin_key: str | None = Header(default=None, alias="x-admin-key"),
 ) -> None:
     if not _ADMIN_KEY_RAW:
-        # Misconfigured server env
         raise HTTPException(status_code=500, detail="Admin key not configured")
     supplied = _extract_admin_key(request, authorization, x_admin_key)
     if not supplied or supplied != _ADMIN_KEY_RAW:
@@ -52,12 +65,8 @@ async def health():
     return {"ok": True}
 
 
-# === CSV export ==============================================================#
+# === CSV export (sample stub; replace _iter_logs with real DB) ================
 def _iter_logs(limit: int) -> Iterable[dict]:
-    """
-    Replace this stub with your real DB query.
-    Keep the keys matching the CSV header below.
-    """
     sample = [
         {
             "id": 1,
@@ -78,10 +87,9 @@ def _iter_logs(limit: int) -> Iterable[dict]:
 
 
 @app.get("/api/admin/export.csv", dependencies=[Depends(require_admin)])
-async def admin_export_csv(limit: int = Query(1000, ge=1, le=10000)) -> Response:
-    """
-    Return logs as CSV. Swap _iter_logs() with your real query.
-    """
+async def admin_export_csv(
+    limit: int = Query(1000, ge=1, le=10000),
+) -> Response:
     buf = io.StringIO()
     fieldnames = ["id", "session_id", "role", "created_at", "content"]
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
