@@ -1,148 +1,89 @@
 # server/main.py
 from __future__ import annotations
 
-import csv
-import hashlib
-import io
-import os
-from typing import Iterable
+from collections import deque
+from datetime import datetime, timezone
+from typing import Any, Deque, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, Request
+from fastapi import Body, FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
-# Create the FastAPI app FIRST (so we can attach middleware to it)
+# -----------------------------------------------------------------------------
+# App
+# -----------------------------------------------------------------------------
 app = FastAPI(title="CogMyra API")
 
-# --- CORS ---------------------------------------------------------------------
-# Deployed web origin(s)
+# -----------------------------------------------------------------------------
+# CORS
+#   - Deployed web app on Render
+#   - Local dev (localhost or 127.0.0.1 on any port)
+# -----------------------------------------------------------------------------
 ALLOWED_ORIGINS = ["https://cogmyra-web.onrender.com"]
-
-# Local dev (Vite) — include common ports explicitly
-ALLOWED_ORIGINS += [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "https://localhost:5173",
-    "https://localhost:5174",
-    "https://localhost:5175",
-]
-
-# If you prefer a single pattern for localhost, you can keep this too:
-LOCALHOST_REGEX = r"^https?://localhost(:\d+)?$"
+LOCALHOST_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # exact matches (includes deploy + local)
-    allow_origin_regex=LOCALHOST_REGEX,  # safety net for other localhost ports
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=LOCALHOST_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# ------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Simple in-memory logging
+# -----------------------------------------------------------------------------
+MAX_LOGS = 500
+LOGS: Deque[Dict[str, Any]] = deque(maxlen=MAX_LOGS)
 
 
-# === Admin key handling ========================================================
-# Read once at process start. On Render, set either ADMIN_KEY or COGMYRA_ADMIN_KEY.
-_ADMIN_KEY_RAW = os.getenv("ADMIN_KEY") or os.getenv("COGMYRA_ADMIN_KEY") or ""
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def _extract_admin_key(
-    request: Request, authorization: str | None, x_admin_key: str | None
-) -> str | None:
-    """
-    Accept either:
-      - Header: x-admin-key: <key>
-      - Header: Authorization: Bearer <key>
-    """
-    if x_admin_key:
-        return x_admin_key.strip()
-    if authorization:
-        parts = authorization.split(None, 1)
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            return parts[1].strip()
-    return None
+def log(kind: str, msg: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    entry = {"ts": now_iso(), "kind": kind, "msg": msg}
+    if extra:
+        entry.update(extra)
+    LOGS.append(entry)
 
 
-async def require_admin(
-    request: Request,
-    authorization: str | None = Header(default=None, alias="Authorization"),
-    x_admin_key: str | None = Header(default=None, alias="x-admin-key"),
-) -> None:
-    if not _ADMIN_KEY_RAW:
-        # Misconfigured server env
-        raise HTTPException(status_code=500, detail="Admin key not configured")
-    supplied = _extract_admin_key(request, authorization, x_admin_key)
-    if not supplied or supplied != _ADMIN_KEY_RAW:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-# === Health ===================================================================
+# -----------------------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------------------
 @app.get("/api/health")
-async def health():
+async def health() -> Dict[str, bool]:
     return {"ok": True}
 
 
-# === Chat (echo stub) =========================================================
-class ChatInput(BaseModel):
-    prompt: str | None = None
-
-
 @app.post("/api/chat")
-async def chat_echo(payload: ChatInput):
-    text = (payload.prompt or "").strip()
-    if not text:
-        return {"reply": "Echo: None"}
-    return {"reply": f"Echo: {text}"}
-
-
-# === CSV export ================================================================#
-def _iter_logs(limit: int) -> Iterable[dict]:
+async def chat(payload: Dict[str, Any] = Body(...)) -> Dict[str, str]:
     """
-    Replace this stub with your real DB query.
-    Keep the keys matching the CSV header below.
+    Echo-style endpoint the frontend is already calling.
     """
-    # Example placeholder rows to verify wiring:
-    sample = [
-        {
-            "id": 1,
-            "session_id": "smoke",
-            "role": "user",
-            "created_at": "2025-09-20T23:26:10.175188",
-            "content": "Say hi in 6 words.",
-        },
-        {
-            "id": 2,
-            "session_id": "smoke",
-            "role": "assistant",
-            "created_at": "2025-09-20T23:26:11.257233",
-            "content": "Hello! How can I assist you today?",
-        },
-    ]
-    yield from sample[:limit]
+    prompt = (payload or {}).get("prompt")
+    log("chat_req", "received prompt", {"prompt": prompt})
+    reply = f"Echo: {prompt}" if prompt is not None else "Echo: None"
+    log("chat_res", "sending reply", {"reply": reply})
+    return {"reply": reply}
 
 
-@app.get("/api/admin/export.csv", dependencies=[Depends(require_admin)])
-async def admin_export_csv(
-    limit: int = Query(1000, ge=1, le=10000),
-) -> Response:
+@app.get("/api/admin/logs")
+async def admin_logs(limit: int = Query(20, ge=1, le=200)) -> List[Dict[str, Any]]:
     """
-    Return logs as CSV. Swap _iter_logs() with your real query.
+    Return the most recent log entries (up to `limit`).
     """
-    buf = io.StringIO()
-    fieldnames = ["id", "session_id", "role", "created_at", "content"]
-    writer = csv.DictWriter(buf, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in _iter_logs(limit):
-        writer.writerow(row)
-    csv_bytes = buf.getvalue().encode("utf-8")
-    return Response(content=csv_bytes, media_type="text/csv")
+    items = list(LOGS)[-limit:]
+    return items
 
 
-# === Debug: compare admin key hash (enable only when DEBUG_ADMIN=1) ===========
-@app.get("/api/_debug/admin-key-hash")
-async def _debug_admin_key_hash():
-    if os.getenv("DEBUG_ADMIN") != "1":
-        raise HTTPException(status_code=404, detail="Not Found")
-    h = hashlib.sha256(_ADMIN_KEY_RAW.encode()).hexdigest() if _ADMIN_KEY_RAW else None
-    return {"server_hash": h, "key_len": len(_ADMIN_KEY_RAW) if _ADMIN_KEY_RAW else 0}
+# Optional: catch-all error handler to log unexpected errors nicely
+@app.exception_handler(Exception)
+async def on_unhandled_error(request: Request, exc: Exception):
+    log(
+        "error",
+        "unhandled exception",
+        {"path": request.url.path, "detail": str(exc)},
+    )
+    return JSONResponse(status_code=500, content={"error": "internal_error"})
