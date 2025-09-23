@@ -1,0 +1,6 @@
+{"ts": "2025-09-23T18:12:14+00:00", "kind": "chat_req", "msg": "received prompt", "prompt": "In one sentence, what is photosynthesis?", "session": "local-dev"}
+{"ts": "2025-09-23T18:12:14+00:00", "kind": "chat_res", "msg": "sending reply", "reply": "Echo: In one sentence, what is photosynthesis?", "session": "local-dev", "provider": "echo"}
+{"ts": "2025-09-23T18:23:09+00:00", "kind": "chat_req", "msg": "received prompt", "prompt": "Explain gravity in one short sentence.", "session": "local-dev"}
+{"ts": "2025-09-23T18:23:10+00:00", "kind": "chat_res", "msg": "sending reply", "reply": "Gravity is the force that pulls objects toward each other, like how the Earth pulls us toward its surface.", "session": "local-dev", "provider": "openai", "model": "gpt-4.1"}
+{"ts": "2025-09-23T18:25:15+00:00", "kind": "chat_req", "msg": "received prompt", "prompt": "Say hello in six words.", "session": "local-dev"}
+{"ts": "2025-09-23T18:25:17+00:00", "kind": "chat_res", "msg": "sending reply", "reply": "Hello! Wishing you a wonderful day!", "session": "local-dev", "provider": "openai", "model": "gpt-4.1"}
