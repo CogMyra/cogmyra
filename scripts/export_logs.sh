@@ -1,33 +1,29 @@
-#!/bin/bash
-# Export CogMyra logs to CSV with timestamped filename
-set -euo pipefail
+cat > ~/Library/LaunchAgents/com.cogmyra.export-logs.plist <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key> <string>com.cogmyra.export-logs</string>
 
-: "${COGMYRA_ADMIN_KEY:?Set COGMYRA_ADMIN_KEY (export COGMYRA_ADMIN_KEY=...)}"
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>~/cogmyra-dev/scripts/export_logs.sh</string>
+  </array>
 
-STAMP="$(date +"%Y%m%d-%H%M%S")"
-OUTFILE="$HOME/Downloads/logs-$STAMP.csv"
-TMP="$(mktemp)"
-HDR="/tmp/cogmyra-export.resp.hdr"
+  <!-- Run once when loaded, then every hour at minute 5 -->
+  <key>RunAtLoad</key> <true/>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Minute</key> <integer>5</integer>
+  </dict>
 
-# Use HTTP/1.1, follow redirects, fail on HTTP errors
-HTTP_STATUS="$(
-  curl --http1.1 -fsS --location \
-    -H "x-admin-key: ${COGMYRA_ADMIN_KEY}" \
-    -D "$HDR" \
-    -o "$TMP" \
-    -w "%{http_code}" \
-    "https://cogmyra-api.onrender.com/api/admin/export.csv" \
-  || true
-)"
+  <key>StandardOutPath</key> <string>/tmp/com.cogmyra.export-logs.out</string>
+  <key>StandardErrorPath</key> <string>/tmp/com.cogmyra.export-logs.err</string>
+  <key>KeepAlive</key> <false/>
+</dict>
+</plist>
+PLIST
 
-if [[ "$HTTP_STATUS" != "200" ]]; then
-  echo "curl: returned HTTP $HTTP_STATUS" >&2
-  sed -n '1,40p' "$HDR" >&2 || true
-  rm -f "$TMP"
-  echo "❌ Export failed (HTTP $HTTP_STATUS). See $HDR for response headers."
-  exit 1
-fi
-
-mv "$TMP" "$OUTFILE"
-chmod 600 "$OUTFILE"
-echo "✅ Logs saved to $OUTFILE"
+chmod 600 ~/Library/LaunchAgents/com.cogmyra.export-logs.plist
