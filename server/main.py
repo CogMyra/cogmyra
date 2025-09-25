@@ -16,6 +16,7 @@ APP_NAME = "cogmyra-api"
 ALLOWED_ORIGINS: List[str] = [
     "https://cogmyra-web-app.onrender.com",  # your Render static site
     "http://localhost:5173",  # vite/dev
+    "http://localhost:5174",  # vite/dev alt
     "http://localhost:4321",  # astro/dev
     "http://localhost:3000",  # next/dev
 ]
