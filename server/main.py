@@ -1,88 +1,95 @@
-# server/main.py
-from __future__ import annotations
-
-from datetime import datetime, timezone
-from typing import List, Literal
-
+from typing import List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+import uvicorn
+import os
+import httpx
+import datetime
 
-APP_NAME = "cogmyra-api"
-BUILD_ID = "cors-clean-v1"
+# -------------------------------------------------
+# FastAPI app
+# -------------------------------------------------
+app = FastAPI()
 
-# --- Allowed web origins (prod + local dev) ---
-ALLOWED_ORIGINS: List[str] = [
-    # Prod static site
-    "https://cogmyra-web-app.onrender.com",
-    # Local dev (Vite) — include the ports you actually use
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-    "http://localhost:5184",
-    "http://localhost:5185",
+# ---- CORS (prod + all Vite localhost ports 5170–5199) ----
+ALLOWED_ORIGINS = [
+    "https://cogmyra-web-app.onrender.com",  # production frontend
 ]
 
-app = FastAPI(title=APP_NAME)
+# allow any localhost:5170–5199 (Vite picks random ports)
+LOCALHOST_REGEX = r"^http://localhost:(517\d|518\d|519\d)$"
 
-# CORS (no credentials; simple GET/POST/OPTIONS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origin_regex=LOCALHOST_REGEX,
+    allow_methods=["*"],
     allow_headers=["*"],
-    max_age=600,
+    allow_credentials=True,
 )
-
-# ---------- Models ----------
-Role = Literal["system", "user", "assistant"]
+# -------------------------------------------------
 
 
+# -------------------------------------------------
+# Models
+# -------------------------------------------------
 class Message(BaseModel):
-    role: Role
+    role: str
     content: str
 
 
 class ChatRequest(BaseModel):
     sessionId: str
     messages: List[Message]
-    model: str | None = None
+    model: Optional[str] = None
 
 
-class ChatResponse(BaseModel):
-    reply: str
-
-
-# ---------- Routes ----------
+# -------------------------------------------------
+# Routes
+# -------------------------------------------------
 @app.get("/api/health")
-def health() -> JSONResponse:
-    return JSONResponse(
-        {
-            "status": "ok",
-            "service": APP_NAME,
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "build": BUILD_ID,
-        }
-    )
+async def health():
+    return {
+        "status": "ok",
+        "service": "cogmyra-api",
+        "ts": datetime.datetime.utcnow().isoformat(),
+        "build": os.getenv("BUILD_TAG", "dev"),
+    }
 
 
-@app.post("/api/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
     """
-    Minimal demo handler.
+    Proxy chat endpoint → forwards to OpenAI API.
     """
-    # Tiny canned response so the web app has something to show.
-    text = req.messages[-1].content.strip().lower() if req.messages else ""
-    if text in {"ping", "hi", "hello"}:
-        reply = "Hello, greetings, hi!"
-    else:
-        reply = "Hello, greetings, hi!"
-    return ChatResponse(reply=reply)
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        return {"error": "OPENAI_API_KEY not set"}
+
+    payload = {
+        "model": req.model or "gpt-4.1",
+        "messages": [m.dict() for m in req.messages],
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {openai_api_key}"},
+            json=payload,
+        )
+        r.raise_for_status()
+        data = r.json()
+
+    return {
+        "session": req.sessionId,
+        "model": payload["model"],
+        "reply": data["choices"][0]["message"]["content"],
+    }
 
 
-# Optional root
-@app.get("/")
-def root() -> JSONResponse:
-    return JSONResponse({"service": APP_NAME, "health": "/api/health"})
+# -------------------------------------------------
+# Run local dev
+# -------------------------------------------------
+if __name__ == "__main__":
+    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)
