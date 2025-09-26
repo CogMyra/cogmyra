@@ -12,22 +12,22 @@ import datetime
 # -------------------------------------------------
 app = FastAPI()
 
-# ---- CORS (prod + all Vite localhost ports 5170–5199) ----
+# ---- CORS (prod + Vite localhost 5170–5199) ----
 ALLOWED_ORIGINS = [
-    "https://cogmyra-web-app.onrender.com",  # production frontend
+    "https://cogmyra-web-app.onrender.com",  # production frontend (old hostname)
+    "https://cogmyra-web.onrender.com",  # production frontend (current hostname)
 ]
-
-# allow any localhost:5170–5199 (Vite picks random ports)
-LOCALHOST_REGEX = r"^http://localhost:(517\d|518\d|519\d)$"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=LOCALHOST_REGEX,
+    # allow all vite dev ports 5170–5199 on localhost
+    allow_origin_regex=r"^http://localhost:5(17|18|19)\d$",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
 )
+
 # -------------------------------------------------
 
 
