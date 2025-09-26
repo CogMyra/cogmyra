@@ -28,8 +28,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------------------------------------------------
-
 
 # -------------------------------------------------
 # Models
@@ -43,6 +41,7 @@ class ChatRequest(BaseModel):
     sessionId: str
     messages: List[Message]
     model: Optional[str] = None
+    temperature: Optional[float] = None  # NEW (0.0–2.0 typical range)
 
 
 # -------------------------------------------------
@@ -67,10 +66,17 @@ async def chat(req: ChatRequest):
     if not openai_api_key:
         return {"error": "OPENAI_API_KEY not set"}
 
+    # Base payload
     payload = {
         "model": req.model or "gpt-4.1",
         "messages": [m.dict() for m in req.messages],
     }
+
+    # Pass temperature only if provided (lets UI choose to omit)
+    if req.temperature is not None:
+        # clamp to a safe range
+        t = max(0.0, min(2.0, float(req.temperature)))
+        payload["temperature"] = t
 
     async with httpx.AsyncClient(timeout=30) as client:
         r = await client.post(
@@ -85,6 +91,7 @@ async def chat(req: ChatRequest):
         "session": req.sessionId,
         "model": payload["model"],
         "reply": data["choices"][0]["message"]["content"],
+        "temperature": payload.get("temperature"),
     }
 
 
