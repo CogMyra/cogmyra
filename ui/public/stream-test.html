@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CogMyra Streaming Test</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      input, button { font: inherit; }
+      .row { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0; align-items: center; }
+      .row label { min-width: 110px; }
+      #out, #log {
+        border: 1px solid #888; border-radius: 8px; padding: 12px; min-height: 120px; white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      #log { min-height: 60px; }
+      .muted { opacity: .7; }
+      .ok { color: #118811; }
+      .err { color: #bb2222; }
+    </style>
+  </head>
+  <body>
+    <h1>CogMyra Streaming Test</h1>
+
+    <div class="row">
+      <label>API Base</label>
+      <input id="base" size="42" value="https://cogmyra-api.onrender.com" />
+    </div>
+
+    <div class="row">
+      <label>API Key</label>
+      <input id="key" size="42" placeholder="X-API-Key value" />
+    </div>
+
+    <div class="row">
+      <label>Session ID</label>
+      <input id="sid" size="16" value="ui-stream-demo" />
+    </div>
+
+    <div class="row">
+      <label>Model</label>
+      <input id="model" size="16" value="gpt-4o-mini" />
+    </div>
+
+    <div class="row">
+      <label>Prompt</label>
+      <input id="prompt" size="64" value="Type HELLO slowly, one token at a time." />
+    </div>
+
+    <div class="row">
+      <button id="btn-stream">Stream via /api/chat/stream</button>
+      <button id="btn-normal">Normal /api/chat</button>
+      <button id="btn-clear">Clear</button>
+    </div>
+
+    <p class="muted">Streaming output:</p>
+    <div id="out"></div>
+
+    <p class="muted">Logs:</p>
+    <div id="log"></div>
+
+    <script>
+      const el = (id) => document.getElementById(id);
+      const out = el('out');
+      const log = el('log');
+
+      function appendOut(txt) { out.textContent += txt; out.scrollTop = out.scrollHeight; }
+      function setOut(txt) { out.textContent = txt; }
+      function setLog(txt, cls = '') { log.innerHTML = `<span class="${cls}">${txt}</span>`; }
+      function addLog(txt, cls = '') { log.innerHTML += `<div class="${cls}">${txt}</div>`; }
+
+      function state(disabled) {
+        el('btn-stream').disabled = disabled;
+        el('btn-normal').disabled = disabled;
+      }
+
+      async function doNormal() {
+        setOut(''); setLog('Requesting /api/chat …');
+        state(true);
+        try {
+          const res = await fetch(`${el('base').value.trim()}/api/chat`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': el('key').value.trim()
+            },
+            body: JSON.stringify({
+              sessionId: el('sid').value.trim(),
+              model: el('model').value.trim(),
+              messages: [{ role: 'user', content: el('prompt').value }]
+            })
+          });
+          addLog(`HTTP ${res.status}`);
+          const txt = await res.text();
+          try {
+            const json = JSON.parse(txt);
+            setOut(JSON.stringify(json, null, 2));
+            setLog('Done.', 'ok');
+          } catch {
+            setOut(txt || '(empty body)');
+            setLog('Non-JSON response shown above.', 'err');
+          }
+        } catch (e) {
+          setLog('Fetch error: ' + String(e), 'err');
+        } finally {
+          state(false);
+        }
+      }
+
+      async function doStream() {
+        setOut(''); setLog('Requesting /api/chat/stream …');
+        state(true);
+        try {
+          const res = await fetch(`${el('base').value.trim()}/api/chat/stream`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': el('key').value.trim()
+            },
+            body: JSON.stringify({
+              sessionId: el('sid').value.trim(),
+              model: el('model').value.trim(),
+              messages: [{ role: 'user', content: el('prompt').value }]
+            })
+          });
+
+          addLog(`HTTP ${res.status}`);
+          if (!res.ok) {
+            const errText = await res.text();
+            setLog('Non-200. Body below.', 'err');
+            setOut(errText);
+            return;
+          }
+
+          if (!res.body || !res.body.getReader) {
+            // Safari or older browsers: fall back to buffered read
+            setLog('ReadableStream not available; falling back to buffered read (Safari often behaves like this).');
+            const text = await res.text();
+            setOut(text);
+            setLog('Buffered SSE shown above.', 'ok');
+            return;
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let gotAnyDelta = false;
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            // Split on blank line = end of event
+            let idx;
+            while ((idx = buffer.indexOf('\n\n')) !== -1) {
+              const chunk = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + 2);
+
+              const lines = chunk.split(/\r?\n/);
+              let dataLine = null, eventName = null;
+              for (const line of lines) {
+                if (line.startsWith('event:')) eventName = line.slice(6).trim();
+                else if (line.startsWith('data:')) dataLine = line.slice(5).trim();
+              }
+              if (!dataLine) continue;
+
+              try {
+                const payload = JSON.parse(dataLine);
+                if (payload.delta) {
+                  appendOut(payload.delta);
+                  gotAnyDelta = true;
+                } else if (payload.error) {
+                  addLog('Stream error: ' + JSON.stringify(payload.error), 'err');
+                } else if (eventName === 'done' || payload.final) {
+                  addLog('Stream done.', 'ok');
+                  if (!gotAnyDelta) addLog('No deltas received (browser may buffer).', 'err');
+                }
+              } catch (e) {
+                addLog('Bad JSON in SSE data: ' + dataLine, 'err');
+              }
+            }
+          }
+        } catch (e) {
+          setLog('Fetch error: ' + String(e), 'err');
+        } finally {
+          state(false);
+        }
+      }
+
+      el('btn-normal').addEventListener('click', doNormal);
+      el('btn-stream').addEventListener('click', doStream);
+      el('btn-clear').addEventListener('click', () => { setOut(''); setLog('Cleared.'); });
+    </script>
+  </body>
+</html>
