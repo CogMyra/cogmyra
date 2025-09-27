@@ -2,360 +2,250 @@
 from __future__ import annotations
 
 import json
-import logging
 import os
 import time
-from typing import Any, Generator, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from openai import (
-    OpenAI,
-    OpenAIError,
-    AuthenticationError,
-    RateLimitError,
-    NotFoundError,
-    BadRequestError,
-    APIStatusError,
-)
 from pydantic import BaseModel, Field
 
-# --------------------------------------------------------------------------------------
-# App/version
-# --------------------------------------------------------------------------------------
+# OpenAI SDK (>=1.x)
+from openai import APIError, AuthenticationError, NotFoundError, OpenAI, RateLimitError
 
-VERSION = "api-v5.3-errors"
+# --------------------------------------------------------------------------------------
+# Version
+# --------------------------------------------------------------------------------------
+VERSION = "api-v5.4-cors"
 
+# --------------------------------------------------------------------------------------
+# App
+# --------------------------------------------------------------------------------------
 app = FastAPI(title="CogMyra API", version=VERSION)
 
-# --------------------------------------------------------------------------------------
-# Env / Config
-# --------------------------------------------------------------------------------------
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-INBOUND_API_KEY = os.getenv("INBOUND_API_KEY", "").strip()
+# --------------------------------------------------------------------------------------
+# CORS (future-proof)
+# - Allow prod origin(s) from env: CORS_ORIGINS="https://yourapp.com,https://app.example"
+# - Also allow any localhost port via a regex, no credentials.
+# --------------------------------------------------------------------------------------
+def _parse_env_origins(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    return [o.strip() for o in value.split(",") if o.strip()]
 
-# CORS: allow env allowlist + localhost:* (no credentials)
-CORS_ORIGINS = [
-    o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()
-]
+
+PROD_ORIGINS = _parse_env_origins(os.getenv("CORS_ORIGINS"))
+# Regex allows: http://localhost:*, http://127.0.0.1:*, http://0.0.0.0:*
+LOCALHOST_REGEX = r"^https?://(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS if CORS_ORIGINS else [],
-    allow_origin_regex=r"^https?://localhost(?::\d+)?$",
-    allow_credentials=False,
+    allow_origins=PROD_ORIGINS,  # explicit prod origins from env
+    allow_origin_regex=LOCALHOST_REGEX,  # any localhost port
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,  # simpler; no cookies
 )
 
+# --------------------------------------------------------------------------------------
 # OpenAI client
-oai: Optional[OpenAI] = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-# Logger
-logger = logging.getLogger("uvicorn.error")
+# --------------------------------------------------------------------------------------
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+oai = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
 # --------------------------------------------------------------------------------------
 # Models
 # --------------------------------------------------------------------------------------
-
-
 class ChatMessage(BaseModel):
-    role: str = Field(..., description="user|assistant|system")
+    role: str
     content: str
 
 
 class ChatRequest(BaseModel):
-    sessionId: str
+    session_id: str = Field(..., alias="sessionId")
     model: str
-    messages: list[ChatMessage]
-    temperature: float | None = 0.2
+    messages: List[ChatMessage]
+    temperature: Optional[float] = 0.7
 
 
 # --------------------------------------------------------------------------------------
-# Utilities
+# Helpers
 # --------------------------------------------------------------------------------------
+def _error(code: str, message: str) -> Dict[str, Any]:
+    return {"error": {"code": code, "message": message}}
 
 
-def json_error(
-    status_code: int, code: str, message: str, request_id: str | None = None
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=status_code,
-        content={"error": {"code": code, "message": message}, "request_id": request_id},
-    )
+def _usage_dict(usage: Any) -> Dict[str, Any]:
+    if not usage:
+        return {}
+    # openai v1 usage has fields: prompt_tokens, completion_tokens, total_tokens
+    return {
+        "prompt_tokens": getattr(usage, "prompt_tokens", None) or 0,
+        "completion_tokens": getattr(usage, "completion_tokens", None) or 0,
+        "total_tokens": getattr(usage, "total_tokens", None) or 0,
+        "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 0,
+        },
+        "completion_tokens_details": {
+            "cached_tokens": 0,
+            "audio_tokens": 0,
+            "reasoning_tokens": 0,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": 0,
+        },
+    }
 
 
-def require_inbound_key(
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
-) -> None:
-    if INBOUND_API_KEY and (not x_api_key or x_api_key != INBOUND_API_KEY):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+def _map_exception(e: Exception) -> JSONResponse:
+    req_id = getattr(e, "request_id", None)
+    if isinstance(e, NotFoundError):
+        payload = _error(
+            "MODEL_NOT_FOUND",
+            "The requested model was not found or you do not have access to it.",
         )
+    elif isinstance(e, AuthenticationError):
+        payload = _error(
+            "UNAUTHORIZED", "Invalid or missing API key for the upstream provider."
+        )
+    elif isinstance(e, RateLimitError):
+        payload = _error(
+            "RATE_LIMITED", "Rate limit hit. Please retry after a short delay."
+        )
+    elif isinstance(e, APIError):
+        payload = _error(
+            "UPSTREAM_ERROR",
+            str(getattr(e, "message", str(e)) or "Upstream provider error."),
+        )
+    else:
+        payload = _error("UNKNOWN", "Unexpected error. Please try again.")
+    payload["request_id"] = req_id
+    return JSONResponse(status_code=400, content=payload)
 
 
-def _usage_to_dict(usage: Any) -> dict:
-    if usage is None:
-        return {}
-    if hasattr(usage, "model_dump"):
-        return usage.model_dump()
+def _log_request(request: Request, *, model: str, started: float) -> None:
     try:
-        return dict(usage)  # type: ignore[arg-type]
-    except Exception:
-        return {}
-
-
-def _sse_line(obj: dict | str, *, event: str | None = None) -> bytes:
-    if event:
-        return (f"event: {event}\n" + f"data: {json.dumps(obj)}\n\n").encode("utf-8")
-    return (f"data: {json.dumps(obj)}\n\n").encode("utf-8")
-
-
-# --------------------------------------------------------------------------------------
-# Middleware: structured request logging
-# --------------------------------------------------------------------------------------
-
-
-@app.middleware("http")
-async def access_log_middleware(request: Request, call_next):
-    started = time.perf_counter()
-    model_hint = ""
-    try:
-        if request.url.path.startswith("/api/chat"):
-            body = await request.body()
-            if body:
-                try:
-                    payload = json.loads(body.decode("utf-8"))
-                    model_hint = payload.get("model", "")
-                except Exception:
-                    pass
-        response = await call_next(request)
-        return response
-    finally:
-        took_ms = int((time.perf_counter() - started) * 1000)
-        logger.info(
+        origin = request.headers.get("origin", "")
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        app.logger.info(
             json.dumps(
                 {
                     "path": request.url.path,
                     "method": request.method,
-                    "origin": request.headers.get("origin", ""),
-                    "model": model_hint,
-                    "latency_ms": took_ms,
+                    "origin": origin,
+                    "model": model,
+                    "latency_ms": latency_ms,
                 }
             )
         )
+    except Exception:
+        # don't fail requests if logging fails
+        pass
+
+
+def _sse_line(obj: Dict[str, Any] | str, *, event: Optional[str] = None) -> bytes:
+    if isinstance(obj, dict):
+        data = json.dumps(obj, ensure_ascii=False)
+    else:
+        data = obj
+    if event:
+        return f"event: {event}\n" f"data: {data}\n\n".encode("utf-8")
+    return f"data: {data}\n\n".encode("utf-8")
 
 
 # --------------------------------------------------------------------------------------
-# Routes
+# Middleware: simple latency logger (stdout -> Render logs)
 # --------------------------------------------------------------------------------------
+@app.middleware("http")
+async def access_log(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    _log_request(request, model="", started=started)
+    return response
 
 
+# --------------------------------------------------------------------------------------
+# Endpoints
+# --------------------------------------------------------------------------------------
 @app.get("/api/health")
-def health() -> dict:
+def health() -> Dict[str, str]:
     return {"ok": "true", "version": VERSION}
 
 
-@app.post("/api/chat", dependencies=[Depends(require_inbound_key)])
-def chat(req: ChatRequest):
-    """
-    Success: { reply, latency_ms, usage, version }
-    Error:   { "error": { "code", "message" }, "request_id": <id|null> }
-    """
+@app.post("/api/chat")
+def chat(req: ChatRequest, request: Request):
     if not OPENAI_API_KEY:
-        return json_error(
-            500, "SERVER_MISCONFIG", "Server missing OPENAI_API_KEY.", None
-        )
-    if oai is None:
-        return json_error(500, "SERVER_INIT", "OpenAI client not initialized.", None)
-
-    start = time.perf_counter()
-    messages = [{"role": m.role, "content": m.content} for m in req.messages]
-
+        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
+    started = time.perf_counter()
     try:
-        completion = oai.chat.completions.create(
+        messages = [{"role": m.role, "content": m.content} for m in req.messages]
+        resp = oai.chat.completions.create(
             model=req.model,
             messages=messages,
             temperature=req.temperature,
         )
-        latency_ms = int((time.perf_counter() - start) * 1000)
-        reply = completion.choices[0].message.content if completion.choices else ""
-        usage = _usage_to_dict(getattr(completion, "usage", None))
-        return {
-            "reply": reply,
-            "latency_ms": latency_ms,
-            "usage": usage,
-            "version": VERSION,
-        }
-
-    # Standardized error mapping (do NOT raise; return envelope)
-    except AuthenticationError as e:
-        return json_error(
-            401,
-            "UPSTREAM_AUTH",
-            "Upstream authentication failed. Check OPENAI_API_KEY.",
-            getattr(e, "request_id", None),
+        reply = (resp.choices[0].message.content or "").strip()
+        usage = _usage_dict(getattr(resp, "usage", None))
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        _log_request(request, model=req.model, started=started)
+        return JSONResponse(
+            content={
+                "reply": reply,
+                "version": VERSION,
+                "latency_ms": latency_ms,
+                "usage": usage,
+                "request_id": getattr(resp, "id", None),
+            }
         )
-    except RateLimitError as e:
-        return json_error(
-            429,
-            "UPSTREAM_RATE_LIMIT",
-            "Upstream rate limit exceeded. Please retry later.",
-            getattr(e, "request_id", None),
-        )
-    except NotFoundError as e:
-        return json_error(
-            400,
-            "MODEL_NOT_FOUND",
-            "The requested model was not found or you do not have access to it.",
-            getattr(e, "request_id", None),
-        )
-    except BadRequestError as e:
-        return json_error(
-            400, "UPSTREAM_BAD_REQUEST", str(e), getattr(e, "request_id", None)
-        )
-    except APIStatusError as e:
-        status_code = int(getattr(e, "status_code", 502) or 502)
-        if 500 <= status_code < 600:
-            return json_error(
-                502,
-                "UPSTREAM_5XX",
-                "Upstream service error. Please try again.",
-                getattr(e, "request_id", None),
-            )
-        return json_error(400, "UPSTREAM_ERROR", str(e), getattr(e, "request_id", None))
-    except OpenAIError as e:
-        return json_error(502, "UPSTREAM_ERROR", str(e), getattr(e, "request_id", None))
-    except Exception:
-        return json_error(500, "INTERNAL", "Unexpected server error.", None)
+    except Exception as e:  # map to standard envelope
+        return _map_exception(e)
 
 
-@app.post("/api/chat/stream", dependencies=[Depends(require_inbound_key)])
-def chat_stream(req: ChatRequest):
-    """
-    SSE stream:
-      data: {"delta": "<chunk>"} (many)
-      event: done
-      data: {"final": true, "reply": "...", "latency_ms": ..., "usage": {...}, "version": VERSION}
-    On failure before stream starts, emits one "error" event.
-    """
-    if not OPENAI_API_KEY or oai is None:
+@app.post("/api/chat/stream")
+def chat_stream(req: ChatRequest, request: Request):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="Server missing OPENAI_API_KEY")
 
-        def fail_gen():
-            yield _sse_line(
-                {
-                    "error": {
-                        "code": "SERVER_MISCONFIG",
-                        "message": "Server missing OPENAI_API_KEY.",
-                    }
-                },
-                event="error",
-            )
+    started = time.perf_counter()
 
-        return StreamingResponse(fail_gen(), media_type="text/event-stream")
-
-    start = time.perf_counter()
-    msgs = [{"role": m.role, "content": m.content} for m in req.messages]
-
-    def gen() -> Generator[bytes, None, None]:
+    def gen() -> Iterable[bytes]:
         try:
+            messages = [{"role": m.role, "content": m.content} for m in req.messages]
             stream = oai.chat.completions.create(
                 model=req.model,
-                messages=msgs,
+                messages=messages,
                 temperature=req.temperature,
                 stream=True,
             )
-            parts: list[str] = []
+            parts: List[str] = []
             for event in stream:
-                piece = event.choices[0].delta.content or ""
+                piece = getattr(event.choices[0].delta, "content", None) or ""
                 if piece:
                     parts.append(piece)
                     yield _sse_line({"delta": piece})
-
-            reply = "".join(parts)
-            latency_ms = int((time.perf_counter() - start) * 1000)
-            usage = _usage_to_dict(getattr(stream, "usage", None))
-            yield _sse_line(
-                {
-                    "final": True,
-                    "reply": reply,
-                    "latency_ms": latency_ms,
-                    "usage": usage,
-                    "version": VERSION,
-                },
-                event="done",
-            )
-
-        except NotFoundError as e:
-            yield _sse_line(
-                {
-                    "error": {
-                        "code": "MODEL_NOT_FOUND",
-                        "message": "The requested model was not found or you do not have access to it.",
-                    },
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except AuthenticationError as e:
-            yield _sse_line(
-                {
-                    "error": {
-                        "code": "UPSTREAM_AUTH",
-                        "message": "Upstream authentication failed. Check OPENAI_API_KEY.",
-                    },
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except RateLimitError as e:
-            yield _sse_line(
-                {
-                    "error": {
-                        "code": "UPSTREAM_RATE_LIMIT",
-                        "message": "Upstream rate limit exceeded. Please retry later.",
-                    },
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except BadRequestError as e:
-            yield _sse_line(
-                {
-                    "error": {"code": "UPSTREAM_BAD_REQUEST", "message": str(e)},
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except APIStatusError as e:
-            status_code = int(getattr(e, "status_code", 502) or 502)
-            code = "UPSTREAM_5XX" if 500 <= status_code < 600 else "UPSTREAM_ERROR"
-            msg = (
-                "Upstream service error. Please try again."
-                if code == "UPSTREAM_5XX"
-                else str(e)
-            )
-            yield _sse_line(
-                {
-                    "error": {"code": code, "message": msg},
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except OpenAIError as e:
-            yield _sse_line(
-                {
-                    "error": {"code": "UPSTREAM_ERROR", "message": str(e)},
-                    "request_id": getattr(e, "request_id", None),
-                },
-                event="error",
-            )
-        except Exception:
-            yield _sse_line(
-                {"error": {"code": "INTERNAL", "message": "Unexpected server error."}},
-                event="error",
-            )
+            # done
+            reply = "".join(parts).strip()
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            usage = _usage_dict(getattr(stream, "usage", None))
+            done_payload = {
+                "final": True,
+                "reply": reply,
+                "latency_ms": latency_ms,
+                "usage": usage,
+                "version": VERSION,
+            }
+            yield _sse_line(done_payload, event="done")
+            _log_request(request, model=req.model, started=started)
+        except Exception as e:
+            # terminal error event so client can close cleanly
+            # shape: {"error":{code,message}, "request_id":...}
+            resp = _map_exception(e)
+            yield _sse_line(resp.body.decode("utf-8"), event="error")
 
     return StreamingResponse(gen(), media_type="text/event-stream")
