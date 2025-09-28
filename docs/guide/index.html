@@ -3,72 +3,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CogMyra Guide</title>
+  <title>CogMyra — Guide</title>
+
+  <!-- No external deps, keep it self-contained -->
   <style>
-    :root { color-scheme: dark; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif; background:#0b1220; color:#e6e9f2; }
-    .wrap { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { margin: 0 0 1rem; font-size: 1.75rem; }
-    .row { display:flex; gap:.75rem; flex-wrap:wrap; margin:.5rem 0; }
-    input, textarea, select, button { background:#0f1930; border:1px solid #1f2a48; color:#e6e9f2; border-radius:10px; padding:.6rem .8rem; }
-    input, select { height: 40px; }
-    textarea { width:100%; min-height:120px; resize:vertical; }
-    button { cursor:pointer; }
-    button:hover { border-color:#315fff; box-shadow:0 0 0 3px rgba(49,95,255,.15); }
-    .meta { opacity:.75; font-size:.9rem; margin-top:.25rem; }
-    pre { background:#0f1930; border:1px solid #1f2a48; border-radius:12px; padding:1rem; overflow:auto; max-height:40vh; }
-    label { opacity:.85; font-size:.9rem; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
-    @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
+    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#9fb3d9; --accent:#5aa3ff; }
+    html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
+    .wrap { max-width:900px; margin:40px auto; padding:0 18px; }
+    a { color:#9db3ff; text-decoration:none; }
+    .btn { display:inline-block; padding:10px 14px; border-radius:10px;
+      background:var(--accent); color:#051024; font-weight:600; }
+    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:16px; }
+    .row { display:grid; gap:16px; grid-template-columns:1fr; }
+    code { background:#0e1727; padding:2px 6px; border-radius:6px; border:1px solid #24385e; }
+    .muted { color:var(--muted); }
   </style>
+
+  <!-- Favicon / Social -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+  <meta name="theme-color" content="#0b1220"/>
+  <meta property="og:title" content="CogMyra — Guide"/>
+  <meta property="og:description" content="How to use CogMyra and verify the API is reachable."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://cogmyra.com/guide/"/>
+  <meta property="og:image" content="https://cogmyra.com/vite.svg"/>
+  <meta name="twitter:card" content="summary_large_image"/>
 </head>
 <body>
   <main class="wrap">
-    <h1>CogMyra Guide</h1>
+    <p><a href="/" class="btn">← Back to Home</a></p>
+    <h1>Guide</h1>
+    <p class="muted">Quick smoke test to confirm the CogMyra API is reachable.</p>
 
     <div class="row">
-      <label>API Key</label>
-      <input id="apiKey" type="password" placeholder="Enter your API key" style="flex:1; min-width:260px;" />
+      <section class="card">
+        <b>API base</b>
+        <p><code id="apiBase">https://cogmyra-api.onrender.com</code></p>
+        <button class="btn" id="pingBtn">Ping API</button>
+        <pre id="out" class="muted" style="white-space:pre-wrap;margin-top:12px;"></pre>
+      </section>
+
+      <section class="card">
+        <b>What’s next</b>
+        <ul>
+          <li>Wire sign-in (magic link).</li>
+          <li>Connect chat to CogMyra GPT-5 engine endpoint.</li>
+          <li>Persist sessions & transcripts.</li>
+        </ul>
+      </section>
     </div>
-
-    <div class="row grid">
-      <div>
-        <label>API Base</label>
-        <input id="apiBase" type="url" placeholder="https://cogmyra-api.onrender.com" />
-      </div>
-      <div>
-        <label>Model</label>
-        <select id="model">
-          <option value="gpt-4o-mini">gpt-4o-mini</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row">
-      <label>Temperature: <span id="tempLabel">1.0</span></label>
-      <input id="temperature" type="range" min="0" max="2" step="0.1" value="1.0" style="width:260px;" />
-      <label><input id="stream" type="checkbox" /> Stream</label>
-    </div>
-
-    <div class="row">
-      <textarea id="userInput" placeholder="Type your message for the Guide…"></textarea>
-    </div>
-
-    <div class="row">
-      <button id="sendBtn">Send</button>
-    </div>
-
-    <section style="margin-top:1rem;">
-      <h2 style="font-size:1.1rem; margin:.5rem 0;">Reply</h2>
-      <div id="reply" style="background:#0f1930; border:1px solid #1f2a48; border-radius:12px; padding:1rem; min-height:80px;"></div>
-    </section>
-
-    <section style="margin-top:1rem;">
-      <h2 style="font-size:1.1rem; margin:.5rem 0;">Logs</h2>
-      <pre id="logsPre">{}</pre>
-    </section>
   </main>
 
-  <script src="./app.v1.js?v=1"></script>
+  <script>
+    const apiBase = document.getElementById('apiBase').textContent.trim();
+    const out = document.getElementById('out');
+    document.getElementById('pingBtn').onclick = async () => {
+      out.textContent = 'Pinging…';
+      try {
+        // Replace /health with your real health/hello path if different
+        const res = await fetch(apiBase.replace(/\/$/,'') + '/health', { mode: 'cors' });
+        const text = await res.text();
+        out.textContent = `Status: ${res.status}\n\n${text}`;
+      } catch (e) {
+        out.textContent = 'Request failed:\n' + (e && e.message ? e.message : String(e));
+      }
+    };
+  </script>
 </body>
 </html>
