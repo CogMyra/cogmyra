@@ -1,200 +1,88 @@
 // ==== CONFIG ====
 // Point this to your Worker / API that calls your CogMyra GPT.
-// If you kept my earlier health endpoint, set both below to your domain.
-const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";       // <— change if needed
-const CHAT_URL   = `${API_BASE}/api/chat`;          // POST  {threadId?, email?, age?, speak?, speed?, message}
-// Optional health check (GET -> {ok:true})
+const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev"; 
+const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
 
-const els = {
-  history:  document.getElementById('history'),
-  messages: document.getElementById('messages'),
-  email:    document.getElementById('email'),
-  age:      document.getElementById('age'),
-  speak:    document.getElementById('speak'),
-  speed:    document.getElementById('speed'),
-  input:    document.getElementById('input'),
-  send:     document.getElementById('send'),
-  speakBtn: document.getElementById('speakBtn'),
-  newThread:document.getElementById('newThread'),
-  health:   document.getElementById('health'),
-};
+// App key must match the Worker secret (currently set to "abc123")
+const APP_KEY = "abc123";
 
-const store = {
-  key: 'cm.guide.threads',
-  all() {
-    try { return JSON.parse(localStorage.getItem(this.key) || '[]'); }
-    catch { return []; }
-  },
-  save(list) { localStorage.setItem(this.key, JSON.stringify(list)); },
-  upsert(thread) {
-    const list = this.all();
-    const i = list.findIndex(t => t.id === thread.id);
-    if (i >= 0) list[i] = thread; else list.unshift(thread);
-    this.save(list);
-  },
-};
-
-let current = null;     // {id, title, messages:[{role,content,ts}]}
-let speaking = false;
-
-// --- UI helpers ---
-function el(tag, attrs={}, ...children){
-  const n = document.createElement(tag);
-  Object.entries(attrs).forEach(([k,v]) => {
-    if (k === 'class') n.className = v;
-    else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
-    else if (v != null) n.setAttribute(k, v);
-  });
-  children.forEach(c => n.append(c));
-  return n;
+function authHeaders() {
+  return {
+    "content-type": "application/json",
+    "x-app-key": APP_KEY,
+  };
 }
 
-function renderHistory(){
-  els.history.innerHTML = '';
-  const list = store.all();
-  for (const t of list) {
-    const first = t.messages?.find(m => m.role === 'user')?.content || 'New chat';
-    const when = new Date(t.updated || Date.now()).toLocaleString();
-    els.history.append(
-      el('div', {class:'item', onclick: () => loadThread(t.id)},
-        first.length > 60 ? first.slice(0, 60) + '…' : first,
-        el('small', {}, when)
-      )
-    );
-  }
-}
+// ==== STATE ====
+let threadId = null;
 
-function renderMessages(){
-  els.messages.innerHTML = '';
-  if (!current) return;
-  for (const m of current.messages) {
-    els.messages.append(
-      el('div', {},
-        el('div', {class:'meta'}, m.role === 'user' ? 'You' : 'CogMyra'),
-        el('div', {class:'bubble ' + (m.role === 'user' ? 'me' : '')}, m.content)
-      )
-    );
-  }
-  els.messages.scrollTop = els.messages.scrollHeight;
-}
-
-function newThread(){
-  current = { id: crypto.randomUUID(), title:'', messages:[], updated: Date.now() };
-  store.upsert(current);
-  renderHistory();
-  renderMessages();
-}
-
-function loadThread(id){
-  const t = store.all().find(x => x.id === id);
-  if (!t) return;
-  current = t;
-  renderHistory();
-  renderMessages();
-}
-
-// --- Speech synthesis ---
-function speakText(text) {
-  if (!els.speak.checked) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = Number(els.speed.value) || 1.0;
-  window.speechSynthesis.speak(u);
-}
-
-// --- Networking ---
-async function sendMessage() {
-  const text = els.input.value.trim();
-  if (!text) return;
-  if (!current) newThread();
-
-  // optimistic UI
-  current.messages.push({ role:'user', content:text, ts:Date.now() });
-  current.updated = Date.now();
-  store.upsert(current);
-  renderHistory();
-  renderMessages();
-  els.input.value = '';
-
+// ==== HELPERS ====
+async function checkHealth() {
   try {
-    const payload = {
-      threadId: current.id,
-      email: els.email.value || undefined,
-      age: els.age.value === 'auto' ? undefined : els.age.value,
-      speak: !!els.speak.checked,
-      speed: Number(els.speed.value) || 1.0,
-      message: text
-    };
+    const res = await fetch(HEALTH_URL, { headers: authHeaders() });
+    const data = await res.json();
+    console.log("Health OK:", data);
+  } catch (err) {
+    console.error("Health check failed", err);
+  }
+}
 
-    const res = await fetch(CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify(payload),
-    });
+async function sendMessage(message) {
+  const payload = {
+    threadId,
+    messages: [{ role: "user", content: message }],
+  };
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
 
-    // Support either {message: "..."} or stream text/plain
-    let assistantText = '';
-    const ct = res.headers.get('content-type') || '';
-    if (ct.includes('application/json')) {
-      const data = await res.json();
-      assistantText = data.message || data.reply || JSON.stringify(data);
-    } else {
-      assistantText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Chat request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  threadId = data.id || threadId; // update threadId if provided
+  return data.choices?.[0]?.message?.content || "(no response)";
+}
+
+// ==== UI HOOKUP ====
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("chat-input");
+  const output = document.getElementById("chat-output");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const userText = input.value.trim();
+    if (!userText) return;
+
+    // show user message
+    const userDiv = document.createElement("div");
+    userDiv.className = "msg user";
+    userDiv.textContent = userText;
+    output.appendChild(userDiv);
+    input.value = "";
+
+    try {
+      const reply = await sendMessage(userText);
+      const botDiv = document.createElement("div");
+      botDiv.className = "msg bot";
+      botDiv.textContent = reply;
+      output.appendChild(botDiv);
+    } catch (err) {
+      const errDiv = document.createElement("div");
+      errDiv.className = "msg error";
+      errDiv.textContent = "Error: " + err.message;
+      output.appendChild(errDiv);
     }
 
-    current.messages.push({ role:'assistant', content:assistantText, ts:Date.now() });
-    current.updated = Date.now();
-    store.upsert(current);
-    renderHistory();
-    renderMessages();
-    speakText(assistantText);
+    output.scrollTop = output.scrollHeight;
+  });
 
-  } catch (err) {
-    const msg = `Error contacting API. ${err.message}`;
-    current.messages.push({ role:'assistant', content: msg, ts:Date.now() });
-    current.updated = Date.now();
-    store.upsert(current);
-    renderMessages();
-  }
-}
-
-async function checkHealth(){
-  try {
-    const r = await fetch(HEALTH_URL, { cache:'no-store' });
-    const ok = r.ok ? 'ok' : `down (HTTP ${r.status})`;
-    els.health.textContent = `API: ${ok}`;
-  } catch {
-    els.health.textContent = 'API: unreachable';
-  }
-}
-
-// --- Wire events ---
-els.send.addEventListener('click', sendMessage);
-els.input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  // initial health check
+  checkHealth();
 });
-els.newThread.addEventListener('click', newThread);
-
-els.speakBtn.addEventListener('click', async () => {
-  // simple microphone capture -> inserts transcript into box (optional later)
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    alert('Speech recognition is not supported in this browser.');
-    return;
-  }
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
-  rec.onresult = (e) => { els.input.value = e.results[0][0].transcript; };
-  rec.onerror = () => {}; rec.onend = () => {};
-  rec.start();
-});
-
-// --- Boot ---
-renderHistory();
-if (store.all().length) loadThread(store.all()[0].id); else newThread();
-checkHealth();
