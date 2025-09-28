@@ -1,14 +1,30 @@
-<!doctype html><html lang="en"><head>
-  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Page not found — CogMyra</title>
-  <link rel="stylesheet" href="/site.css">
-</head><body>
-  <script>fetch('/_header.html').then(r=>r.text()).then(h=>document.body.insertAdjacentHTML('afterbegin',h));</script>
-  <main class="container">
-    <div class="card" style="padding:24px">
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>404 — Page not found | CogMyra</title>
+  <style>
+    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#9fb3d9; --accent:#5aa3ff; }
+    html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
+    .wrap { max-width:900px; margin:60px auto; padding:0 18px; }
+    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:20px; }
+    a.btn { display:inline-block; padding:10px 14px; border-radius:10px; background:var(--accent);
+      color:#051024; font-weight:600; text-decoration:none; }
+    a.secondary { background:transparent; color:var(--fg); border:1px solid #2a3b5f; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="card">
       <h1>404 — Page not found</h1>
-      <p>Try one of these:</p>
-      <p><a class="btn" href="/">Home</a> <a class="btn secondary" href="/guide/">Guide</a></p>
+      <p class="muted">The page you’re looking for doesn’t exist.</p>
+      <p>
+        <a class="btn" href="/">Go to Home</a>
+        <a class="btn secondary" href="/guide/">Try the Guide</a>
+      </p>
     </div>
   </main>
-</body></html>
+</body>
+</html>
