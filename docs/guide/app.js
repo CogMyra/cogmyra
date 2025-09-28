@@ -3,6 +3,7 @@
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
+const APP_KEY = "abc123";   // must match wrangler secret
 
 // This must match the Worker secret you set.
 const APP_KEY = "abc123";
