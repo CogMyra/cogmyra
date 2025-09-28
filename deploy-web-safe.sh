@@ -1,6 +1,17 @@
 #!/bin/zsh
 set -e
 
+echo "[1/5] Building web app..."
+
+echo "[2/5] Publishing index/robots/vite.svg..."
+
+echo "[3/5] Publishing assets (with --delete)..."
+
+echo "[4/5] Committing changes..."
+
+echo "[5/5] Pushing to origin/main..."
+
+
 cd ~/cogmyra-web
 npm run build
 
