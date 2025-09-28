@@ -1,222 +1,149 @@
-// /public/guide/app.js
-// Minimal, dependency-free wiring for the Guide page.
-// - Sends chat to your API
-// - Shows reply + (latency · tokens · version)
-// - Pretty-prints full JSON logs
-// - Supports temperature slider, model select, and API base picker
-// - Gracefully no-ops if some elements are missing
+// Minimal, dependency-free Guide wiring.
+// Safe if some elements are missing (guards everywhere).
 
 // ---------- tiny DOM helpers
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-// ---------- localStorage helpers
+// ---------- state helpers
 const LS = {
   get(key, fallback = null) {
-    try {
-      const v = localStorage.getItem(key);
-      return v === null ? fallback : JSON.parse(v);
-    } catch {
-      return fallback;
-    }
+    try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+    catch { return fallback; }
   },
-  set(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
-  },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
 };
 
-// ---------- elements (all optional; we guard if missing)
+// ---------- elements (optional; all guarded)
 const el = {
   sendBtn: $("#sendBtn"),
-  refreshBtn: $("#refreshLogs"),
   userInput: $("#userInput"),
   reply: $("#reply"),
   logsPre: $("#logsPre") || $("#logs") || $("#logsJson"),
   temp: $("#temperature"),
   tempLabel: $("#tempLabel"),
   model: $("#model"),
-  apiBaseInput: $("#apiBase"),
-  apiStatus: $("#apiStatus") || $("#healthBadge") || $("#apiBadge"),
+  apiBaseInput: $("#apiBase"),    // optional override
+  apiKeyInput: $("#apiKey"),      // where user types the key
+  streamToggle: $("#stream"),     // checkbox for streaming
 };
 
-// ---------- config
-const DEFAULT_API_BASE = "https://cogmyra-api.onrender.com";
-const DEFAULT_MODEL = "gpt-4.1";
-const SESSION_ID = "guide";
+// ---------- defaults
+const DEFAULTS = {
+  apiBase: "https://cogmyra-api.onrender.com",
+  model: "gpt-4o-mini",
+  sessionId: LS.get("cm.sessionId") || (crypto?.randomUUID?.() ?? String(Date.now())),
+};
+LS.set("cm.sessionId", DEFAULTS.sessionId);
 
-// ---------- utils
-function getApiBase() {
-  const fromInput =
-    el.apiBaseInput && el.apiBaseInput.value.trim()
-      ? el.apiBaseInput.value.trim()
-      : null;
-  return fromInput || LS.get("apiBase", DEFAULT_API_BASE);
+// hydrate UI (if controls exist)
+if (el.apiBaseInput && !el.apiBaseInput.value) el.apiBaseInput.value = LS.get("cm.apiBase", DEFAULTS.apiBase);
+if (el.model && !el.model.value) el.model.value = LS.get("cm.model", DEFAULTS.model);
+if (el.temp && el.tempLabel) el.tempLabel.textContent = (el.temp.value ?? 1.0);
+if (el.apiKeyInput && !el.apiKeyInput.value) el.apiKeyInput.value = LS.get("cm.apiKey", "");
+
+// ---------- util: current config
+function cfg() {
+  const apiBase = (el.apiBaseInput && el.apiBaseInput.value?.trim()) || DEFAULTS.apiBase;
+  const model = (el.model && el.model.value) || DEFAULTS.model;
+  const temperature = el.temp ? Number(el.temp.value || 1.0) : 1.0;
+  const stream = el.streamToggle ? !!el.streamToggle.checked : false;
+  const apiKey = (el.apiKeyInput && el.apiKeyInput.value?.trim()) || LS.get("cm.apiKey", "");
+  return { apiBase, model, temperature, stream, apiKey };
 }
 
-function setApiBase(val) {
-  if (el.apiBaseInput) el.apiBaseInput.value = val;
-  LS.set("apiBase", val);
+// persist some UI changes
+["change","input"].forEach(evt => {
+  el.apiBaseInput && el.apiBaseInput.addEventListener(evt, () => LS.set("cm.apiBase", el.apiBaseInput.value.trim()));
+  el.model && el.model.addEventListener(evt, () => LS.set("cm.model", el.model.value));
+  el.apiKeyInput && el.apiKeyInput.addEventListener(evt, () => LS.set("cm.apiKey", el.apiKeyInput.value.trim()));
+  el.temp && el.temp.addEventListener(evt, () => { if (el.tempLabel) el.tempLabel.textContent = el.temp.value; });
+});
+
+// ---------- logging
+function log(obj) {
+  const arr = LS.get("cm.logs", []);
+  arr.push({ t: new Date().toISOString(), ...obj });
+  LS.set("cm.logs", arr);
+  if (el.logsPre) el.logsPre.textContent = JSON.stringify(arr, null, 2);
 }
 
-function setStatusBadge(text, ok = true) {
-  if (!el.apiStatus) return;
-  el.apiStatus.textContent = text;
-  // simple coloring without css framework
-  el.apiStatus.style.padding = "2px 6px";
-  el.apiStatus.style.borderRadius = "12px";
-  el.apiStatus.style.fontSize = "12px";
-  el.apiStatus.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial";
-  el.apiStatus.style.display = "inline-block";
-  el.apiStatus.style.background = ok ? "#e8f5e9" : "#ffebee";
-  el.apiStatus.style.color = ok ? "#1b5e20" : "#b71c1c";
-  el.apiStatus.style.border = `1px solid ${ok ? "#c8e6c9" : "#ffcdd2"}`;
+// ---------- render helpers
+function setReply(html) {
+  if (el.reply) el.reply.innerHTML = html;
+}
+function metaLine({ version, latency_ms, usage, request_id }) {
+  const tokens = usage?.total_tokens ?? "-";
+  return `<div style="opacity:.7;font-size:.9em;margin-top:.5rem;">(${latency_ms ?? "–"} ms · tokens ${tokens} · ${version ?? "api"}) · <code>${request_id ?? ""}</code></div>`;
 }
 
-function pretty(obj) {
-  try {
-    return JSON.stringify(obj, null, 2);
-  } catch {
-    return String(obj);
-  }
-}
-
-function setReply(text) {
-  if (!el.reply) return;
-  el.reply.textContent = text;
-}
-
-function setLogs(obj) {
-  if (!el.logsPre) return;
-  el.logsPre.textContent = pretty(obj);
-}
-
-// temperature label sync
-function syncTempLabel() {
-  if (!el.temp || !el.tempLabel) return;
-  el.tempLabel.textContent = Number(el.temp.value).toFixed(2);
-}
-
-// ---------- API calls
-async function checkHealth() {
-  const base = getApiBase();
-  try {
-    const r = await fetch(`${base}/api/health`, { credentials: "include" });
-    const json = await r.json();
-    const ok = r.ok && (json.ok === "true" || json.status === "ok");
-    const version = json.version || json.build || "unknown";
-    setStatusBadge(`API ${ok ? "OK" : "DOWN"} · ${version}`, ok);
-    setLogs(json);
-  } catch (e) {
-    setStatusBadge("API DOWN", false);
-    setLogs({ error: String(e), apiBase: base });
-  }
-}
-
-async function sendChat() {
-  const base = getApiBase();
-  const model = el.model?.value || LS.get("model", DEFAULT_MODEL);
-  const temperatureRaw = el.temp ? Number(el.temp.value) : null;
-  // only include temperature if present (so backend can treat missing vs explicit)
-  const maybeTemp =
-    typeof temperatureRaw === "number" && !Number.isNaN(temperatureRaw)
-      ? temperatureRaw
-      : undefined;
-
-  const content = el.userInput?.value?.trim() || "";
-
-  if (!content) {
-    setReply("(enter a prompt first)");
+// ---------- main send
+async function sendMessage() {
+  const ui = cfg();
+  if (!ui.apiKey) {
+    setReply(`<em>Enter your API key to send.</em>`);
     return;
   }
+  const userText = (el.userInput && el.userInput.value.trim()) || "Hello from CogMyra Guide";
+  if (!userText) return;
+
+  setReply("Sending…");
 
   const body = {
-    sessionId: SESSION_ID,
-    model,
-    messages: [{ role: "user", content }],
+    sessionId: DEFAULTS.sessionId,
+    model: ui.model,
+    temperature: ui.temperature,
+    messages: [{ role: "user", content: userText }],
+    ...(ui.stream ? { stream: true } : {}),
   };
-  if (maybeTemp !== undefined) body.temperature = maybeTemp;
-
-  setReply("…sending…");
+  const url = `${ui.apiBase.replace(/\/+$/,"")}/api/chat`;
+  const headers = {
+    "content-type": "application/json",
+    "x-api-key": ui.apiKey, // IMPORTANT: exact header name your API expects
+  };
 
   try {
-    const res = await fetch(`${base}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    setLogs(data);
-
-    const extra = [];
-    if (typeof data.latency_ms === "number") extra.push(`⏱ ${data.latency_ms} ms`);
-    if (data.usage && data.usage.total_tokens != null)
-      extra.push(`🔢 ${data.usage.total_tokens} tokens`);
-    if (data.version) extra.push(`🔁 ${data.version}`);
-
-    const suffix = extra.length ? `\n\n(${extra.join(" · ")})` : "";
-
-    setReply((data.reply || "(no reply)") + suffix);
-  } catch (e) {
-    setReply("(request failed)");
-    setLogs({ error: String(e), apiBase: base });
-    setStatusBadge("API DOWN", false);
+    if (ui.stream) {
+      // Streaming: server may send full JSON or incremental chunks.
+      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.body) {
+        // fallback: if no stream body, just parse JSON
+        const j = await res.json();
+        setReply(`${(j.reply ?? "").replace(/\n/g,"<br>")}${metaLine(j)}`);
+        log({ type:"chat", mode:"stream-fallback-json", ok:true, request: body, response: j });
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      setReply("");
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        if (el.reply) el.reply.textContent = acc; // raw stream view
+      }
+      log({ type:"chat", mode:"stream", ok:true, request: body, responseRaw: acc });
+    } else {
+      // Non-streaming JSON
+      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.detail || `HTTP ${res.status}`);
+      setReply(`${(j.reply ?? "").replace(/\n/g,"<br>")}${metaLine(j)}`);
+      log({ type:"chat", mode:"json", ok:true, request: body, response: j });
+    }
+  } catch (err) {
+    setReply(`<span style="color:#ff6868;">Error:</span> ${String(err?.message || err)}`);
+    log({ type:"chat", ok:false, error:String(err?.message || err) });
   }
 }
 
-// ---------- wiring
-function wireButtons() {
-  el.sendBtn?.addEventListener("click", sendChat);
-  el.refreshBtn?.addEventListener("click", checkHealth);
-}
+// ---------- wire UI
+if (el.sendBtn) el.sendBtn.addEventListener("click", sendMessage);
+if (el.userInput) el.userInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
 
-function wireTemp() {
-  if (!el.temp) return;
-  // restore saved temp if any
-  const saved = LS.get("temperature");
-  if (saved != null) {
-    el.temp.value = String(saved);
-  }
-  syncTempLabel();
-  el.temp.addEventListener("input", () => {
-    LS.set("temperature", Number(el.temp.value));
-    syncTempLabel();
-  });
-}
-
-function wireModel() {
-  if (!el.model) return;
-  // restore saved model
-  const saved = LS.get("model", DEFAULT_MODEL);
-  el.model.value = saved;
-  el.model.addEventListener("change", () => {
-    LS.set("model", el.model.value);
-  });
-}
-
-function wireApiPicker() {
-  const saved = LS.get("apiBase", DEFAULT_API_BASE);
-  setApiBase(saved);
-  el.apiBaseInput?.addEventListener("change", () => {
-    const v = el.apiBaseInput.value.trim();
-    if (v) setApiBase(v);
-    // ping health on change
-    checkHealth();
-  });
-}
-
-// ---------- init
-function init() {
-  wireButtons();
-  wireTemp();
-  wireModel();
-  wireApiPicker();
-
-  // initial health check (also fills logs with health JSON)
-  checkHealth();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+// initial logs render
+log({ type:"boot", sessionId: DEFAULTS.sessionId, apiBase: cfg().apiBase, model: cfg().model });
