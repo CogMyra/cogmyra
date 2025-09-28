@@ -1,7 +1,7 @@
 // ==== CONFIG ====
 // Point this to your Worker / API that calls your CogMyra GPT.
 // If you kept my earlier health endpoint, set both below to your domain.
-const API_BASE   = "https://api.cogmyra.com";       // <— change if needed
+const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";       // <— change if needed
 const CHAT_URL   = `${API_BASE}/api/chat`;          // POST  {threadId?, email?, age?, speak?, speed?, message}
 // Optional health check (GET -> {ok:true})
 const HEALTH_URL = `${API_BASE}/api/health`;
