@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CogMyra — Data Requests</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{margin:0;background:#0b1220;color:#e6e9f2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+    .wrap{max-width:900px;margin:2rem auto;padding:0 1rem}
+    h1{font-size:1.75rem;margin:0 0 1rem}
+    label{display:block;margin:.75rem 0 .25rem;opacity:.85}
+    input,textarea,button{background:#0f1930;border:1px solid #1f2a48;color:#e6e9f2;border-radius:10px;padding:.6rem .8rem;width:100%}
+    textarea{min-height:100px}
+    button{cursor:pointer;margin-top:1rem}
+    button:hover{border-color:#315fff;box-shadow:0 0 0 3px rgba(49,95,255,.15)}
+    .note{opacity:.75;font-size:.9rem;margin-top:.25rem}
+  </style>
+</head>
+<body>
+  <!-- include: header -->
+  <!--HEADER-->
+  <main class="wrap">
+    <h1>Data Access & Deletion Requests</h1>
+    <p class="note">Use this form to request an export of your data or ask us to delete it. We’ll reply by email.</p>
+
+    <form action="https://formspree.io/f/your-id-here" method="POST">
+      <label>Your email</label>
+      <input type="email" name="email" required placeholder="you@example.com" />
+      <label>Request type</label>
+      <select name="type" required>
+        <option value="access">Access / Export my data</option>
+        <option value="delete">Delete my data</option>
+        <option value="other">Other</option>
+      </select>
+      <label>Details (optional)</label>
+      <textarea name="details" placeholder="Anything we should know…"></textarea>
+      <button type="submit">Submit request</button>
+      <p class="note">Temporary submission via Formspree — we can swap to your own endpoint later.</p>
+    </form>
+  </main>
+  <script>
+    fetch('/_header.html').then(r=>r.text()).then(h=>{
+      document.body.innerHTML = document.body.innerHTML.replace('<!--HEADER-->', h)
+    });
+  </script>
+</body>
+</html>
