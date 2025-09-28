@@ -1,50 +1,81 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>CogMyra — Smoke Test</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>CogMyra — Your Personalized AI Learning Coach</title>
+  <meta name="description" content="CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you.">
 
   <style>
     :root { color-scheme: dark; }
     body {
       margin: 0;
-      padding: 48px;
       background: #0b1220;
       color: #e6e9f2;
-      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif;
     }
-    .box {
-      max-width: 780px;
-      margin: 0 auto;
-    }
-    h1 { margin: 0 0 12px; }
-    p { opacity: .9; }
-    code {
-      background: #111a33;
-      border: 1px solid #223260;
-      border-radius: 8px;
-      padding: 2px 6px;
-    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 48px 18px; }
+    h1 { font-size: clamp(28px,4.2vw,46px); line-height: 1.1; margin: 0 0 14px; }
+    p.lead { opacity: .88; max-width: 62ch; }
+    .row { display: grid; gap: 28px; grid-template-columns: 1.1fr .9fr; align-items: center; }
+    @media (max-width: 900px) { .row { grid-template-columns: 1fr; } }
+    .card { background: #0f1930; border: 1px solid #1f2a48; border-radius: 14px; padding: 16px; }
+    .btn { display:inline-block; background:#315fff; border:1px solid #315fff; color:#fff;
+           text-decoration:none; padding:10px 14px; border-radius:10px; font-weight:600; }
+    .btn.secondary { background:transparent; color:#e6e9f2; border:1px solid #3a4a88; }
+    .badge { display:inline-block; background:#15224b; border:1px solid #2b3a6e; border-radius:999px;
+             color:#9db3ff; padding:4px 10px; font-size:12px; margin-bottom:10px; }
+    .grid3 { display:grid; gap:16px; grid-template-columns:repeat(3,1fr); }
+    @media (max-width:900px) { .grid3 { grid-template-columns:1fr; } }
+    .small { opacity:.7; font-size:13px; }
   </style>
 
-  <!-- Minimal meta tags for SEO/social -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <meta property="og:title" content="CogMyra — Smoke Test">
-  <meta property="og:description" content="Verifying GitHub Pages is serving updated index.html.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://cogmyra.com/">
-  <meta property="og:image" content="https://cogmyra.com/vite.svg">
-  <meta name="twitter:card" content="summary_large_image">
+  <!-- Favicon -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+  <link rel="apple-touch-icon" href="/favicon.svg"/>
+  <meta name="theme-color" content="#0b1220"/>
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="CogMyra — Your Personalized AI Learning Coach"/>
+  <meta property="og:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://cogmyra.com/"/>
+  <meta property="og:image" content="https://cogmyra.com/vite.svg"/>
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="CogMyra — Your Personalized AI Learning Coach"/>
+  <meta name="twitter:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you."/>
+  <meta name="twitter:image" content="https://cogmyra.com/vite.svg"/>
 </head>
 <body>
-  <div class="box">
-    <h1>✅ CogMyra is serving the new index.html</h1>
-    <p>If you can see this, the deploy pipeline is working correctly.</p>
-    <p>Page render time: <code><span id="now"></span></code></p>
-  </div>
-  <script>
-    document.getElementById('now').textContent = new Date().toISOString();
-  </script>
+  <main class="container">
+    <div class="row">
+      <section>
+        <span class="badge">Learning, faster</span>
+        <h1>Your Personalized AI<br/>Learning Coach</h1>
+        <p class="lead">CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you. Sign in with a magic link and start chatting with your guide in seconds.</p>
+        <div style="display:flex;gap:12px;margin-top:14px">
+          <a class="btn" href="/guide/">Try the Guide</a>
+          <a class="btn secondary" href="#how">How it works →</a>
+        </div>
+        <p class="small" style="margin-top:10px">API Base: <code>https://cogmyra-api.onrender.com</code></p>
+      </section>
+
+      <aside class="card">
+        <div class="small" style="opacity:.8;margin-bottom:6px">Preview</div>
+        <div class="card" style="margin-bottom:10px"><b>You</b><br/>Explain photosynthesis like I’m 12.</div>
+        <div class="card"><b>CogMyra</b><br/>Think of leaves as tiny solar panels. They take in sunlight, water, and carbon dioxide and turn that into food for the plant and oxygen for us…</div>
+      </aside>
+    </div>
+
+    <section id="how" style="margin-top:36px">
+      <div class="grid3">
+        <div class="card"><b>Fast sign-in</b><br/><span class="small">Passwordless magic link—just your email.</span></div>
+        <div class="card"><b>Personalized help</b><br/><span class="small">A guide that adapts to your level.</span></div>
+        <div class="card"><b>Built for learning</b><br/><span class="small">Explanations, practice, and feedback—saved to your account.</span></div>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
