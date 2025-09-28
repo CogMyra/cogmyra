@@ -6,7 +6,7 @@
   <title>CogMyra Guide – Your AI Learning Coach</title>
 
   <!-- SEO -->
-  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback." />
+  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback tailored to you." />
   <meta property="og:title" content="CogMyra Guide – Your AI Learning Coach" />
   <meta property="og:description" content="Instant explanations, practice, and feedback tailored to you." />
   <meta property="og:type" content="website" />
@@ -19,112 +19,96 @@
   <meta name="twitter:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
 
   <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#22314b; }
+    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#2d3a55; }
     * { box-sizing: border-box; }
     html, body { height:100%; }
-    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
     header { display:flex; align-items:center; gap:10px; padding:20px 24px; border-bottom:1px solid var(--border); }
-    header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); display:grid; place-items:center; color:#001a3c; font-weight:700; }
-    header .brand { line-height:1; }
+    header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); display:grid; place-items:center; font-weight:bold; color:#071122; }
     header .brand .name { font-weight:700; }
     header .brand .sub { color:var(--muted); font-size:12px; }
 
-    .container { display:grid; grid-template-columns: 280px 1fr; gap:16px; height:calc(100% - 62px); padding:16px 16px 12px; }
-    .left, .right { background:transparent; }
-
-    /* History (left) */
+    .container { display:grid; grid-template-columns: 280px 1fr; gap:16px; height:calc(100% - 62px); padding:16px; }
     .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; }
     .history { height:100%; display:flex; flex-direction:column; }
-    .history header { padding:12px 12px; border-bottom:1px solid var(--border); }
+    .history header { padding:12px; border-bottom:1px solid var(--border); }
     .history header h3 { font-size:14px; margin:0; }
     .history .scroll { overflow:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
     .history .item { background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer; }
     .history .item small { color:var(--muted); display:block; margin-top:6px; }
-    .history .new { margin:8px; }
-    .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--fg); padding:8px 10px; border-radius:10px; cursor:pointer; }
+    .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--fg); padding:8px 10px; border-radius:8px; cursor:pointer; }
     .btn.primary { background:var(--acc); color:#071122; border-color:transparent; font-weight:600; }
     .btn.block { width:100%; }
-
-    /* Chat (right) */
     .chat { height:100%; display:flex; flex-direction:column; }
-    .toolbar { display:flex; gap:8px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:14px; background:var(--panel); margin-bottom:10px; }
-    .toolbar input[type="email"] { flex:1; min-width:160px; padding:8px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--fg); }
-    .toolbar select, .toolbar label { font-size:14px; color:var(--fg); }
-    .toolbar select { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:6px; color:var(--fg); }
-    .toolbar .row { display:flex; align-items:center; gap:8px; }
-
-    .messages { flex:1; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:12px; border:1px solid var(--border); border-radius:14px; background:var(--panel); }
-    .bubble { border:1px solid var(--border); background:var(--panel2); border-radius:12px; padding:10px 12px; white-space:pre-wrap; }
-    .bubble.me { background:#0f2441; }
-    .meta { color:var(--muted); font-size:12px; margin-bottom:3px; }
-
-    .composer { display:flex; gap:8px; margin-top:10px; }
-    textarea.input { flex:1; min-height:52px; max-height:140px; resize:vertical; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--fg); }
-    .btn.send { min-width:88px; font-weight:700; }
-    .btn.speak { min-width:88px; }
-
-    /* API Health */
-    .health { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--panel); color:var(--muted); }
-    .links { margin-top:10px; display:flex; gap:10px; }
-    a.link { color:var(--fg); text-decoration:none; border:1px solid var(--border); background:var(--panel); padding:8px 10px; border-radius:10px; }
-    a.link:hover { border-color:#39527c; }
+    .chat .scroll { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+    .bubble { padding:12px 14px; border-radius:12px; max-width:70%; }
+    .bubble.user { background:var(--acc); color:#071122; align-self:flex-end; }
+    .bubble.ai { background:var(--panel2); border:1px solid var(--border); align-self:flex-start; }
+    .chat form { display:flex; gap:8px; padding:16px; border-top:1px solid var(--border); }
+    .chat input { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--fg); }
   </style>
 </head>
 <body>
   <header>
     <div class="logo">CM</div>
     <div class="brand">
-      <div class="name">CogMyra</div>
+      <div class="name">CogMyra Guide</div>
       <div class="sub">Your AI Learning Coach</div>
     </div>
   </header>
 
   <div class="container">
-    <!-- Left: History -->
-    <div class="left panel history">
+    <div class="panel history">
       <header><h3>History</h3></header>
-      <div class="new"><button class="btn primary block" id="newThread">+ New</button></div>
       <div class="scroll" id="history"></div>
+      <div class="new"><button class="btn primary block" onclick="newChat()">+ New Chat</button></div>
     </div>
-
-    <!-- Right: Chat -->
-    <div class="right chat">
-      <div class="toolbar">
-        <input id="email" type="email" placeholder="Your email (optional)" />
-        <div class="row">
-          <label for="age">How old are you?</label>
-          <select id="age">
-            <option value="auto" selected>Auto</option>
-            <option>6</option><option>8</option><option>10</option>
-            <option>12</option><option>14</option><option>16</option>
-            <option>18</option><option>Adult</option>
-          </select>
-        </div>
-        <div class="row">
-          <label><input id="speak" type="checkbox" /> Speak responses</label>
-        </div>
-        <div class="row">
-          <label>Speed <input id="speed" type="range" min="0.5" max="1.25" step="0.05" value="1"/></label>
-        </div>
-      </div>
-
-      <div class="messages" id="messages"></div>
-
-      <div class="composer">
-        <textarea id="input" class="input" placeholder="Type your question…"></textarea>
-        <button id="send" class="btn primary send">Send</button>
-        <button id="speakBtn" class="btn speak">🎤 Speak</button>
-      </div>
-
-      <div class="health" id="health">API: checking…</div>
-      <div class="links">
-        <a class="link" href="/" aria-label="Back to Home">← Back to Home</a>
-        <a class="link" href="mailto:hello@cogmyra.com" aria-label="Contact">Contact</a>
-      </div>
+    <div class="panel chat">
+      <div class="scroll" id="chat"></div>
+      <form onsubmit="handleSubmit(event)">
+        <input id="message" placeholder="Type your question..." autocomplete="off" />
+        <button class="btn primary">Send</button>
+      </form>
     </div>
   </div>
 
-  <script src="./app.js?v=2"></script>
+  <script>
+    const API_BASE = "https://cogmyra-proxy.cogmyra.workers.dev";
+
+    let chatHistory = [];
+
+    function addMessage(role, content) {
+      chatHistory.push({ role, content });
+      const bubble = document.createElement("div");
+      bubble.className = "bubble " + role;
+      bubble.textContent = content;
+      document.getElementById("chat").appendChild(bubble);
+      document.getElementById("chat").scrollTop = chat.scrollHeight;
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById("message");
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage("user", text);
+      input.value = "";
+
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: chatHistory }),
+      });
+
+      const data = await res.json();
+      addMessage("ai", data.output || "[No response]");
+    }
+
+    function newChat() {
+      chatHistory = [];
+      document.getElementById("chat").innerHTML = "";
+    }
+  </script>
 </body>
 </html>
