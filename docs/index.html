@@ -1,45 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>CogMyra — Live Demos</title>
-  <style>
-    body{margin:0;background:#0b1220;color:#e6e9f2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
-    .wrap{max-width:900px;margin:6rem auto;padding:0 1.25rem}
-    h1{font-size:2rem;margin:0 0 1rem}
-    p{opacity:.85;line-height:1.5}
-    .badges{margin:.75rem 0 2rem}
-    .badge{display:inline-block;background:#111a33;border:1px solid #1f2a48;border-radius:999px;padding:.25rem .75rem;margin-right:.5rem;font-size:.85rem}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.25rem}
-    a.card{display:block;text-decoration:none;color:inherit;background:#0e1830;border:1px solid #1e2b52;border-radius:16px;padding:1rem}
-    a.card:hover{border-color:#315fff;box-shadow:0 0 0 3px rgba(49,95,255,.15)}
-    .title{font-weight:600;margin:0 0 .25rem}
-    .desc{opacity:.8;font-size:.95rem;margin:0}
-    footer{opacity:.7;margin-top:2.5rem;font-size:.9rem}
-  </style>
-</head>
-<body>
-  <!-- include: header -->
-  <script>fetch("/_header.html").then(r=>r.text()).then(h=>document.body.insertAdjacentHTML("afterbegin",h));</script>
-  <main class="wrap">
-    <h1>CogMyra Demo Pages</h1>
-    <div class="badges">
-      <span class="badge">api-v5.7.4-gpt5-tempfix2</span>
-      <span class="badge">GitHub Pages</span>
-    </div>
-    <p>Select a demo to open:</p>
-    <section class="grid">
-      <a class="card" href="./chat-demo.html">
-        <div class="title">Chat Demo</div>
-        <p class="desc">Simple UI that sends POST <code>/api/chat</code> using your X-Api-Key.</p>
-      </a>
-      <a class="card" href="./stream-test.html">
-        <div class="title">Stream Test</div>
-        <p class="desc">SSE streaming via <code>/api/chat</code> with <code>stream:true</code>.</p>
-      </a>
-    </section>
-    <footer>© CogMyra</footer>
-  </main>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>CogMyra</title>
+    <script type="module" crossorigin src="/assets/index-CtTwd_6l.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
