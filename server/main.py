@@ -29,7 +29,9 @@ CORS_ORIGINS_ENV = [
 ]
 
 DEFAULT_CORS = [
-    "https://cogmyra.github.io",  # GitHub Pages origin
+    "https://cogmyra.github.io",
+    "https://cogmyra.com",
+    "https://www.cogmyra.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
