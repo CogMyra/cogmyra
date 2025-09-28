@@ -8,22 +8,26 @@
     :root { --bg:#0b1220; --fg:#e9eef8; --muted:#9fb3d9; --accent:#5aa3ff; }
     html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
       font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
-    .wrap { max-width:900px; margin:60px auto; padding:0 18px; }
-    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:20px; }
+    .wrap { max-width:1000px; margin:52px auto; padding:0 18px; }
+    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:22px; }
+    h1 { margin:0 0 8px; font-size:38px; }
+    p.muted { color:var(--muted); margin:0 0 16px; }
+    .actions { display:flex; gap:10px; }
     a.btn { display:inline-block; padding:10px 14px; border-radius:10px; background:var(--accent);
-      color:#051024; font-weight:600; text-decoration:none; }
+      color:#051024; font-weight:600; text-decoration:none; border:1px solid #315fff; }
     a.secondary { background:transparent; color:var(--fg); border:1px solid #2a3b5f; }
   </style>
 </head>
 <body>
+  <!-- IMPORTANT: no header injection here to avoid double-render -->
   <main class="wrap">
     <div class="card">
       <h1>404 — Page not found</h1>
-      <p class="muted">The page you’re looking for doesn’t exist.</p>
-      <p>
-        <a class="btn" href="/">Go to Home</a>
-        <a class="btn secondary" href="/guide/">Try the Guide</a>
-      </p>
+      <p class="muted">Try one of these:</p>
+      <div class="actions">
+        <a class="btn" href="/">Home</a>
+        <a class="btn secondary" href="/guide/">Guide</a>
+      </div>
     </div>
   </main>
 </body>
