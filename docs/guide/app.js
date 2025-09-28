@@ -1,88 +1,140 @@
 // ==== CONFIG ====
 // Point this to your Worker / API that calls your CogMyra GPT.
-const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev"; 
+const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
 
-// App key must match the Worker secret (currently set to "abc123")
+// This must match the Worker secret you set.
 const APP_KEY = "abc123";
 
-function authHeaders() {
-  return {
-    "content-type": "application/json",
-    "x-app-key": APP_KEY,
-  };
+// Reusable headers for all requests from the guide.
+const COMMON_HEADERS = {
+  "content-type": "application/json",
+  "x-app-key": APP_KEY,
+};
+
+// ==== ELEMENTS ====
+const els = {
+  history:  document.getElementById('history'),
+  messages: document.getElementById('messages'),
+  email:    document.getElementById('email'),
+  age:      document.getElementById('age'),
+  speak:    document.getElementById('speak'),
+  speed:    document.getElementById('speed'),
+  input:    document.getElementById('input'),
+  send:     document.getElementById('send'),
+  speakBtn: document.getElementById('speakBtn'),
+  newThread:document.getElementById('newThread'),
+  health:   document.getElementById('health'),
+};
+
+// ==== LOCAL STORAGE ====
+const store = {
+  key: 'cm.guide.threads',
+  all() {
+    try { return JSON.parse(localStorage.getItem(this.key) || '[]'); }
+    catch { return []; }
+  },
+  save(list) { localStorage.setItem(this.key, JSON.stringify(list)); },
+  upsert(thread) {
+    const list = this.all();
+    const i = list.findIndex(t => t.id === thread.id);
+    if (i >= 0) list[i] = thread; else list.unshift(thread);
+    this.save(list);
+  },
+};
+
+let current = null;     // {id, title, messages:[{role,content,ts}]}
+let speaking = false;
+
+// ==== UI HELPERS ====
+function el(tag, attrs={}, ...children){
+  const n = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v]) => {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+    else if (v != null) n.setAttribute(k, v);
+  });
+  children.forEach(c => n.append(c));
+  return n;
 }
 
-// ==== STATE ====
-let threadId = null;
+function renderThreadList(){
+  els.history.innerHTML = "";
+  store.all().forEach(t => {
+    const btn = el("button", {
+      class:"thread-btn",
+      onclick: () => loadThread(t.id)
+    }, t.title || "(untitled)");
+    els.history.append(btn);
+  });
+}
 
-// ==== HELPERS ====
-async function checkHealth() {
+function renderMessages(){
+  els.messages.innerHTML = "";
+  current.messages.forEach(m => {
+    const bubble = el("div", {class:`bubble ${m.role}`}, m.content);
+    els.messages.append(bubble);
+  });
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+function loadThread(id){
+  const thread = store.all().find(t => t.id === id);
+  if (!thread) return;
+  current = thread;
+  renderMessages();
+}
+
+function newThread(){
+  current = { id: Date.now().toString(), title:"New Chat", messages:[] };
+  store.upsert(current);
+  renderThreadList();
+  renderMessages();
+}
+
+// ==== NETWORK ====
+async function checkHealth(){
   try {
-    const res = await fetch(HEALTH_URL, { headers: authHeaders() });
+    const res = await fetch(HEALTH_URL, { headers: COMMON_HEADERS });
+    if (!res.ok) throw new Error("bad status");
     const data = await res.json();
-    console.log("Health OK:", data);
-  } catch (err) {
-    console.error("Health check failed", err);
+    els.health.textContent = "✅ Online: " + data.now;
+  } catch(e){
+    els.health.textContent = "❌ Offline";
   }
 }
 
-async function sendMessage(message) {
-  const payload = {
-    threadId,
-    messages: [{ role: "user", content: message }],
-  };
+async function sendMessage(){
+  if (!current) newThread();
+  const text = els.input.value.trim();
+  if (!text) return;
+  els.input.value = "";
 
-  const res = await fetch(CHAT_URL, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
+  current.messages.push({role:"user", content:text, ts:Date.now()});
+  renderMessages();
+  store.upsert(current);
 
-  if (!res.ok) {
-    throw new Error(`Chat request failed: ${res.status}`);
+  try {
+    const res = await fetch(CHAT_URL, {
+      method:"POST",
+      headers: COMMON_HEADERS,
+      body: JSON.stringify({ messages: current.messages })
+    });
+    if (!res.ok) throw new Error("bad status");
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || "(no reply)";
+    current.messages.push({role:"assistant", content:reply, ts:Date.now()});
+    renderMessages();
+    store.upsert(current);
+  } catch(e){
+    current.messages.push({role:"assistant", content:"[Error: "+e.message+"]", ts:Date.now()});
+    renderMessages();
   }
-
-  const data = await res.json();
-  threadId = data.id || threadId; // update threadId if provided
-  return data.choices?.[0]?.message?.content || "(no response)";
 }
 
-// ==== UI HOOKUP ====
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("chat-form");
-  const input = document.getElementById("chat-input");
-  const output = document.getElementById("chat-output");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const userText = input.value.trim();
-    if (!userText) return;
-
-    // show user message
-    const userDiv = document.createElement("div");
-    userDiv.className = "msg user";
-    userDiv.textContent = userText;
-    output.appendChild(userDiv);
-    input.value = "";
-
-    try {
-      const reply = await sendMessage(userText);
-      const botDiv = document.createElement("div");
-      botDiv.className = "msg bot";
-      botDiv.textContent = reply;
-      output.appendChild(botDiv);
-    } catch (err) {
-      const errDiv = document.createElement("div");
-      errDiv.className = "msg error";
-      errDiv.textContent = "Error: " + err.message;
-      output.appendChild(errDiv);
-    }
-
-    output.scrollTop = output.scrollHeight;
-  });
-
-  // initial health check
-  checkHealth();
-});
+// ==== INIT ====
+els.send.onclick = sendMessage;
+els.newThread.onclick = newThread;
+checkHealth();
+renderThreadList();
