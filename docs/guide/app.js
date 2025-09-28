@@ -1,149 +1,200 @@
-// Minimal, dependency-free Guide wiring.
-// Safe if some elements are missing (guards everywhere).
+// ==== CONFIG ====
+// Point this to your Worker / API that calls your CogMyra GPT.
+// If you kept my earlier health endpoint, set both below to your domain.
+const API_BASE   = "https://api.cogmyra.com";       // <— change if needed
+const CHAT_URL   = `${API_BASE}/api/chat`;          // POST  {threadId?, email?, age?, speak?, speed?, message}
+// Optional health check (GET -> {ok:true})
+const HEALTH_URL = `${API_BASE}/api/health`;
 
-// ---------- tiny DOM helpers
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+const els = {
+  history:  document.getElementById('history'),
+  messages: document.getElementById('messages'),
+  email:    document.getElementById('email'),
+  age:      document.getElementById('age'),
+  speak:    document.getElementById('speak'),
+  speed:    document.getElementById('speed'),
+  input:    document.getElementById('input'),
+  send:     document.getElementById('send'),
+  speakBtn: document.getElementById('speakBtn'),
+  newThread:document.getElementById('newThread'),
+  health:   document.getElementById('health'),
+};
 
-// ---------- state helpers
-const LS = {
-  get(key, fallback = null) {
-    try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
-    catch { return fallback; }
+const store = {
+  key: 'cm.guide.threads',
+  all() {
+    try { return JSON.parse(localStorage.getItem(this.key) || '[]'); }
+    catch { return []; }
   },
-  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+  save(list) { localStorage.setItem(this.key, JSON.stringify(list)); },
+  upsert(thread) {
+    const list = this.all();
+    const i = list.findIndex(t => t.id === thread.id);
+    if (i >= 0) list[i] = thread; else list.unshift(thread);
+    this.save(list);
+  },
 };
 
-// ---------- elements (optional; all guarded)
-const el = {
-  sendBtn: $("#sendBtn"),
-  userInput: $("#userInput"),
-  reply: $("#reply"),
-  logsPre: $("#logsPre") || $("#logs") || $("#logsJson"),
-  temp: $("#temperature"),
-  tempLabel: $("#tempLabel"),
-  model: $("#model"),
-  apiBaseInput: $("#apiBase"),    // optional override
-  apiKeyInput: $("#apiKey"),      // where user types the key
-  streamToggle: $("#stream"),     // checkbox for streaming
-};
+let current = null;     // {id, title, messages:[{role,content,ts}]}
+let speaking = false;
 
-// ---------- defaults
-const DEFAULTS = {
-  apiBase: "https://cogmyra-api.onrender.com",
-  model: "gpt-4o-mini",
-  sessionId: LS.get("cm.sessionId") || (crypto?.randomUUID?.() ?? String(Date.now())),
-};
-LS.set("cm.sessionId", DEFAULTS.sessionId);
-
-// hydrate UI (if controls exist)
-if (el.apiBaseInput && !el.apiBaseInput.value) el.apiBaseInput.value = LS.get("cm.apiBase", DEFAULTS.apiBase);
-if (el.model && !el.model.value) el.model.value = LS.get("cm.model", DEFAULTS.model);
-if (el.temp && el.tempLabel) el.tempLabel.textContent = (el.temp.value ?? 1.0);
-if (el.apiKeyInput && !el.apiKeyInput.value) el.apiKeyInput.value = LS.get("cm.apiKey", "");
-
-// ---------- util: current config
-function cfg() {
-  const apiBase = (el.apiBaseInput && el.apiBaseInput.value?.trim()) || DEFAULTS.apiBase;
-  const model = (el.model && el.model.value) || DEFAULTS.model;
-  const temperature = el.temp ? Number(el.temp.value || 1.0) : 1.0;
-  const stream = el.streamToggle ? !!el.streamToggle.checked : false;
-  const apiKey = (el.apiKeyInput && el.apiKeyInput.value?.trim()) || LS.get("cm.apiKey", "");
-  return { apiBase, model, temperature, stream, apiKey };
+// --- UI helpers ---
+function el(tag, attrs={}, ...children){
+  const n = document.createElement(tag);
+  Object.entries(attrs).forEach(([k,v]) => {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+    else if (v != null) n.setAttribute(k, v);
+  });
+  children.forEach(c => n.append(c));
+  return n;
 }
 
-// persist some UI changes
-["change","input"].forEach(evt => {
-  el.apiBaseInput && el.apiBaseInput.addEventListener(evt, () => LS.set("cm.apiBase", el.apiBaseInput.value.trim()));
-  el.model && el.model.addEventListener(evt, () => LS.set("cm.model", el.model.value));
-  el.apiKeyInput && el.apiKeyInput.addEventListener(evt, () => LS.set("cm.apiKey", el.apiKeyInput.value.trim()));
-  el.temp && el.temp.addEventListener(evt, () => { if (el.tempLabel) el.tempLabel.textContent = el.temp.value; });
-});
-
-// ---------- logging
-function log(obj) {
-  const arr = LS.get("cm.logs", []);
-  arr.push({ t: new Date().toISOString(), ...obj });
-  LS.set("cm.logs", arr);
-  if (el.logsPre) el.logsPre.textContent = JSON.stringify(arr, null, 2);
-}
-
-// ---------- render helpers
-function setReply(html) {
-  if (el.reply) el.reply.innerHTML = html;
-}
-function metaLine({ version, latency_ms, usage, request_id }) {
-  const tokens = usage?.total_tokens ?? "-";
-  return `<div style="opacity:.7;font-size:.9em;margin-top:.5rem;">(${latency_ms ?? "–"} ms · tokens ${tokens} · ${version ?? "api"}) · <code>${request_id ?? ""}</code></div>`;
-}
-
-// ---------- main send
-async function sendMessage() {
-  const ui = cfg();
-  if (!ui.apiKey) {
-    setReply(`<em>Enter your API key to send.</em>`);
-    return;
+function renderHistory(){
+  els.history.innerHTML = '';
+  const list = store.all();
+  for (const t of list) {
+    const first = t.messages?.find(m => m.role === 'user')?.content || 'New chat';
+    const when = new Date(t.updated || Date.now()).toLocaleString();
+    els.history.append(
+      el('div', {class:'item', onclick: () => loadThread(t.id)},
+        first.length > 60 ? first.slice(0, 60) + '…' : first,
+        el('small', {}, when)
+      )
+    );
   }
-  const userText = (el.userInput && el.userInput.value.trim()) || "Hello from CogMyra Guide";
-  if (!userText) return;
+}
 
-  setReply("Sending…");
+function renderMessages(){
+  els.messages.innerHTML = '';
+  if (!current) return;
+  for (const m of current.messages) {
+    els.messages.append(
+      el('div', {},
+        el('div', {class:'meta'}, m.role === 'user' ? 'You' : 'CogMyra'),
+        el('div', {class:'bubble ' + (m.role === 'user' ? 'me' : '')}, m.content)
+      )
+    );
+  }
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
 
-  const body = {
-    sessionId: DEFAULTS.sessionId,
-    model: ui.model,
-    temperature: ui.temperature,
-    messages: [{ role: "user", content: userText }],
-    ...(ui.stream ? { stream: true } : {}),
-  };
-  const url = `${ui.apiBase.replace(/\/+$/,"")}/api/chat`;
-  const headers = {
-    "content-type": "application/json",
-    "x-api-key": ui.apiKey, // IMPORTANT: exact header name your API expects
-  };
+function newThread(){
+  current = { id: crypto.randomUUID(), title:'', messages:[], updated: Date.now() };
+  store.upsert(current);
+  renderHistory();
+  renderMessages();
+}
+
+function loadThread(id){
+  const t = store.all().find(x => x.id === id);
+  if (!t) return;
+  current = t;
+  renderHistory();
+  renderMessages();
+}
+
+// --- Speech synthesis ---
+function speakText(text) {
+  if (!els.speak.checked) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = Number(els.speed.value) || 1.0;
+  window.speechSynthesis.speak(u);
+}
+
+// --- Networking ---
+async function sendMessage() {
+  const text = els.input.value.trim();
+  if (!text) return;
+  if (!current) newThread();
+
+  // optimistic UI
+  current.messages.push({ role:'user', content:text, ts:Date.now() });
+  current.updated = Date.now();
+  store.upsert(current);
+  renderHistory();
+  renderMessages();
+  els.input.value = '';
 
   try {
-    if (ui.stream) {
-      // Streaming: server may send full JSON or incremental chunks.
-      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      if (!res.body) {
-        // fallback: if no stream body, just parse JSON
-        const j = await res.json();
-        setReply(`${(j.reply ?? "").replace(/\n/g,"<br>")}${metaLine(j)}`);
-        log({ type:"chat", mode:"stream-fallback-json", ok:true, request: body, response: j });
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      setReply("");
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        if (el.reply) el.reply.textContent = acc; // raw stream view
-      }
-      log({ type:"chat", mode:"stream", ok:true, request: body, responseRaw: acc });
+    const payload = {
+      threadId: current.id,
+      email: els.email.value || undefined,
+      age: els.age.value === 'auto' ? undefined : els.age.value,
+      speak: !!els.speak.checked,
+      speed: Number(els.speed.value) || 1.0,
+      message: text
+    };
+
+    const res = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    // Support either {message: "..."} or stream text/plain
+    let assistantText = '';
+    const ct = res.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const data = await res.json();
+      assistantText = data.message || data.reply || JSON.stringify(data);
     } else {
-      // Non-streaming JSON
-      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j?.detail || `HTTP ${res.status}`);
-      setReply(`${(j.reply ?? "").replace(/\n/g,"<br>")}${metaLine(j)}`);
-      log({ type:"chat", mode:"json", ok:true, request: body, response: j });
+      assistantText = await res.text();
     }
+
+    current.messages.push({ role:'assistant', content:assistantText, ts:Date.now() });
+    current.updated = Date.now();
+    store.upsert(current);
+    renderHistory();
+    renderMessages();
+    speakText(assistantText);
+
   } catch (err) {
-    setReply(`<span style="color:#ff6868;">Error:</span> ${String(err?.message || err)}`);
-    log({ type:"chat", ok:false, error:String(err?.message || err) });
+    const msg = `Error contacting API. ${err.message}`;
+    current.messages.push({ role:'assistant', content: msg, ts:Date.now() });
+    current.updated = Date.now();
+    store.upsert(current);
+    renderMessages();
   }
 }
 
-// ---------- wire UI
-if (el.sendBtn) el.sendBtn.addEventListener("click", sendMessage);
-if (el.userInput) el.userInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+async function checkHealth(){
+  try {
+    const r = await fetch(HEALTH_URL, { cache:'no-store' });
+    const ok = r.ok ? 'ok' : `down (HTTP ${r.status})`;
+    els.health.textContent = `API: ${ok}`;
+  } catch {
+    els.health.textContent = 'API: unreachable';
+  }
+}
+
+// --- Wire events ---
+els.send.addEventListener('click', sendMessage);
+els.input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+els.newThread.addEventListener('click', newThread);
+
+els.speakBtn.addEventListener('click', async () => {
+  // simple microphone capture -> inserts transcript into box (optional later)
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('Speech recognition is not supported in this browser.');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
+  rec.onresult = (e) => { els.input.value = e.results[0][0].transcript; };
+  rec.onerror = () => {}; rec.onend = () => {};
+  rec.start();
 });
 
-// initial logs render
-log({ type:"boot", sessionId: DEFAULTS.sessionId, apiBase: cfg().apiBase, model: cfg().model });
+// --- Boot ---
+renderHistory();
+if (store.all().length) loadThread(store.all()[0].id); else newThread();
+checkHealth();

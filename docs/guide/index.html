@@ -5,124 +5,126 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CogMyra Guide – Your AI Learning Coach</title>
 
-  <!-- Primary SEO -->
-  <meta name="description" content="Try the CogMyra Guide: your personalized AI learning coach. Get instant explanations, practice, and feedback tailored to you." />
-
-  <!-- Open Graph -->
+  <!-- SEO -->
+  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback." />
   <meta property="og:title" content="CogMyra Guide – Your AI Learning Coach" />
-  <meta property="og:description" content="Try the CogMyra Guide: your personalized AI learning coach. Get instant explanations, practice, and feedback tailored to you." />
+  <meta property="og:description" content="Instant explanations, practice, and feedback tailored to you." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://cogmyra.com/guide/" />
   <meta property="og:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
   <meta property="og:image:width" content="1200"/>
   <meta property="og:image:height" content="630"/>
   <meta property="og:image:alt" content="CogMyra – Your AI Learning Coach"/>
-
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="CogMyra Guide – Your AI Learning Coach" />
-  <meta name="twitter:description" content="Instant practice, feedback, and explanations tailored to you." />
   <meta name="twitter:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
 
   <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; }
+    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#22314b; }
     * { box-sizing: border-box; }
     html, body { height:100%; }
-    body {
-      margin:0; background:var(--bg); color:var(--fg);
-      font:16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      display:flex; align-items:stretch; justify-content:center;
-    }
-    .wrap { width:100%; max-width:900px; padding:32px 20px 80px; }
-    header { display:flex; align-items:center; gap:12px; margin-bottom:28px; }
-    header .logo {
-      width:36px; height:36px; border-radius:10px; background:var(--acc);
-      display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#001733;
-    }
-    h1 { font-size:2rem; margin:0 0 8px; }
-    p.lead { margin:0 0 18px; color:var(--muted); }
-    .card {
-      background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
-      border-radius:16px; padding:20px; margin:18px 0;
-    }
-    .btn {
-      display:inline-block; padding:12px 16px; border-radius:12px;
-      border:1px solid rgba(255,255,255,0.12); text-decoration:none; color:var(--fg);
-    }
-    .btn.primary { border-color:transparent; background:var(--acc); color:#061326; font-weight:700; }
-    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
-    @media (min-width: 760px) { .grid { grid-template-columns: 1fr 1fr; } }
-    code, pre { background:#0f1a2b; border:1px solid #17243a; border-radius:10px; padding:12px; }
-    pre { overflow:auto; }
-    footer { margin-top:36px; color:var(--muted); font-size:0.9rem; }
-    a { color: var(--acc); }
+    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+
+    header { display:flex; align-items:center; gap:10px; padding:20px 24px; border-bottom:1px solid var(--border); }
+    header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); display:grid; place-items:center; color:#001a3c; font-weight:700; }
+    header .brand { line-height:1; }
+    header .brand .name { font-weight:700; }
+    header .brand .sub { color:var(--muted); font-size:12px; }
+
+    .container { display:grid; grid-template-columns: 280px 1fr; gap:16px; height:calc(100% - 62px); padding:16px 16px 12px; }
+    .left, .right { background:transparent; }
+
+    /* History (left) */
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; }
+    .history { height:100%; display:flex; flex-direction:column; }
+    .history header { padding:12px 12px; border-bottom:1px solid var(--border); }
+    .history header h3 { font-size:14px; margin:0; }
+    .history .scroll { overflow:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
+    .history .item { background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer; }
+    .history .item small { color:var(--muted); display:block; margin-top:6px; }
+    .history .new { margin:8px; }
+    .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--fg); padding:8px 10px; border-radius:10px; cursor:pointer; }
+    .btn.primary { background:var(--acc); color:#071122; border-color:transparent; font-weight:600; }
+    .btn.block { width:100%; }
+
+    /* Chat (right) */
+    .chat { height:100%; display:flex; flex-direction:column; }
+    .toolbar { display:flex; gap:8px; align-items:center; padding:10px; border:1px solid var(--border); border-radius:14px; background:var(--panel); margin-bottom:10px; }
+    .toolbar input[type="email"] { flex:1; min-width:160px; padding:8px; border-radius:10px; border:1px solid var(--border); background:var(--panel2); color:var(--fg); }
+    .toolbar select, .toolbar label { font-size:14px; color:var(--fg); }
+    .toolbar select { background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:6px; color:var(--fg); }
+    .toolbar .row { display:flex; align-items:center; gap:8px; }
+
+    .messages { flex:1; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:12px; border:1px solid var(--border); border-radius:14px; background:var(--panel); }
+    .bubble { border:1px solid var(--border); background:var(--panel2); border-radius:12px; padding:10px 12px; white-space:pre-wrap; }
+    .bubble.me { background:#0f2441; }
+    .meta { color:var(--muted); font-size:12px; margin-bottom:3px; }
+
+    .composer { display:flex; gap:8px; margin-top:10px; }
+    textarea.input { flex:1; min-height:52px; max-height:140px; resize:vertical; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--panel); color:var(--fg); }
+    .btn.send { min-width:88px; font-weight:700; }
+    .btn.speak { min-width:88px; }
+
+    /* API Health */
+    .health { margin-top:14px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--panel); color:var(--muted); }
+    .links { margin-top:10px; display:flex; gap:10px; }
+    a.link { color:var(--fg); text-decoration:none; border:1px solid var(--border); background:var(--panel); padding:8px 10px; border-radius:10px; }
+    a.link:hover { border-color:#39527c; }
   </style>
-<style>
-html{background:#0b1220;}
-body{visibility:visible!important;opacity:1!important;}
-#app,main{visibility:visible!important;opacity:1!important;display:block!important;}
-</style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="logo">CM</div>
-      <div>
-        <div style="font-weight:700">CogMyra</div>
-        <div style="color:var(--muted); font-size:0.9rem;">Your AI Learning Coach</div>
-      </div>
-    </header>
+  <header>
+    <div class="logo">CM</div>
+    <div class="brand">
+      <div class="name">CogMyra</div>
+      <div class="sub">Your AI Learning Coach</div>
+    </div>
+  </header>
 
-    <h1>CogMyra Guide</h1>
-    <p class="lead">Instant explanations, practice, and feedback — tailored to how you learn.</p>
-
-    <div class="grid">
-      <div class="card">
-        <h3>How it works</h3>
-        <ol>
-          <li>Ask a question or paste a concept you’re learning.</li>
-          <li>Get a clear explanation, then <strong>practice</strong> with generated exercises.</li>
-          <li>Receive <strong>feedback</strong> that adapts to your mistakes and style.</li>
-        </ol>
-      </div>
-      <div class="card">
-        <h3>Try a quick prompt</h3>
-        <pre><code>Explain the chain rule like I’m a visual learner,
-then give 3 practice problems from easy to hard.</code></pre>
-      </div>
+  <div class="container">
+    <!-- Left: History -->
+    <div class="left panel history">
+      <header><h3>History</h3></header>
+      <div class="new"><button class="btn primary block" id="newThread">+ New</button></div>
+      <div class="scroll" id="history"></div>
     </div>
 
-    <div class="card">
-      <h3>API Health</h3>
-      <p id="health">Checking…</p>
-      <noscript>Enable JavaScript to run a live health check.</noscript>
+    <!-- Right: Chat -->
+    <div class="right chat">
+      <div class="toolbar">
+        <input id="email" type="email" placeholder="Your email (optional)" />
+        <div class="row">
+          <label for="age">How old are you?</label>
+          <select id="age">
+            <option value="auto" selected>Auto</option>
+            <option>6</option><option>8</option><option>10</option>
+            <option>12</option><option>14</option><option>16</option>
+            <option>18</option><option>Adult</option>
+          </select>
+        </div>
+        <div class="row">
+          <label><input id="speak" type="checkbox" /> Speak responses</label>
+        </div>
+        <div class="row">
+          <label>Speed <input id="speed" type="range" min="0.5" max="1.25" step="0.05" value="1"/></label>
+        </div>
+      </div>
+
+      <div class="messages" id="messages"></div>
+
+      <div class="composer">
+        <textarea id="input" class="input" placeholder="Type your question…"></textarea>
+        <button id="send" class="btn primary send">Send</button>
+        <button id="speakBtn" class="btn speak">🎤 Speak</button>
+      </div>
+
+      <div class="health" id="health">API: checking…</div>
+      <div class="links">
+        <a class="link" href="/" aria-label="Back to Home">← Back to Home</a>
+        <a class="link" href="mailto:hello@cogmyra.com" aria-label="Contact">Contact</a>
+      </div>
     </div>
-
-    <p>
-      <a class="btn primary" href="/">Back to Home</a>
-      <a class="btn" href="mailto:hello@cogmyra.com">Contact</a>
-    </p>
-
-    <footer>
-      © <span id="yr"></span> CogMyra. All rights reserved.
-    </footer>
   </div>
 
-  <!-- Optional progressive enhancement: tiny inline script for year + health check -->
-  <script>
-    document.getElementById('yr').textContent = new Date().getFullYear();
-    (async () => {
-      const el = document.getElementById('health');
-      try {
-        // If you have a real endpoint, put it here:
-        const r = await fetch('https://cogmyra.com/health.json', { cache: 'no-store' });
-        if (!r.ok) throw new Error('not ok');
-        const data = await r.json();
-        el.textContent = data.status ? `API: ${data.status}` : 'API: ok';
-      } catch {
-        el.textContent = 'API: ok'; // fall back to "ok" so the page never feels broken
-      }
-    })();
-  </script>
+  <script src="./app.js?v=2"></script>
 </body>
 </html>
