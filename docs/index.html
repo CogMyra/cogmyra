@@ -4,17 +4,31 @@
   <meta charset="utf-8">
   <title>CogMyra — Smoke Test</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
   <style>
-    :root{color-scheme:dark}
-    body{margin:0;padding:48px;background:#0b1220;color:#e6e9f2;
-         font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
-    .box{max-width:780px;margin:0 auto}
-    h1{margin:0 0 12px}
-    p{opacity:.9}
-    code{background:#111a33;border:1px solid #223260;border-radius:8px;padding:2px 6px}
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      padding: 48px;
+      background: #0b1220;
+      color: #e6e9f2;
+      font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif;
+    }
+    .box {
+      max-width: 780px;
+      margin: 0 auto;
+    }
+    h1 { margin: 0 0 12px; }
+    p { opacity: .9; }
+    code {
+      background: #111a33;
+      border: 1px solid #223260;
+      border-radius: 8px;
+      padding: 2px 6px;
+    }
   </style>
 
-  <!-- Basic share meta so previews still look ok -->
+  <!-- Minimal meta tags for SEO/social -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <meta property="og:title" content="CogMyra — Smoke Test">
   <meta property="og:description" content="Verifying GitHub Pages is serving updated index.html.">
@@ -26,9 +40,11 @@
 <body>
   <div class="box">
     <h1>✅ CogMyra is serving the new index.html</h1>
-    <p>If you can read this, hosting + deploy are good. Next we’ll swap in the designed landing.</p>
-    <p>Time now: <code><span id="now"></span></code></p>
+    <p>If you can see this, the deploy pipeline is working correctly.</p>
+    <p>Page render time: <code><span id="now"></span></code></p>
   </div>
-  <script>document.getElementById('now').textContent = new Date().toISOString();</script>
+  <script>
+    document.getElementById('now').textContent = new Date().toISOString();
+  </script>
 </body>
 </html>
