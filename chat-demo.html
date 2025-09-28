@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>CogMyra Chat Demo (multi-turn)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg:#0b0f14; --panel:#131922; --muted:#6b7a90; --acc:#7bdcff; --acc2:#b6f09c;
+      --me:#1f2b3a; --bot:#0f2536; --border:#233043;
+    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#e8eef7;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto}
+    h1{font-size:20px;margin:16px}
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    input,textarea,button{border-radius:8px;border:1px solid var(--border);background:#0e1420;color:#e8eef7;padding:10px}
+    input,textarea{width:100%}
+    textarea{min-height:90px}
+    button{cursor:pointer;padding:10px 14px}
+    .btn{background:#152033;border-color:#2a3b55}
+    .btn:hover{filter:brightness(1.1)}
+    .btn.acc{background:#132433;border-color:#2c4c66}
+    .btn.warn{background:#2a1b1b;border-color:#553838}
+    .stack{display:flex;gap:8px;flex-wrap:wrap}
+    .chat{background:var(--panel);border:1px solid var(--border);border-radius:12px;height:380px;overflow:auto;padding:12px}
+    .msg{max-width:78%;margin:6px 0;padding:10px 12px;border-radius:14px;border:1px solid var(--border);white-space:pre-wrap}
+    .me{margin-left:auto;background:var(--me)}
+    .bot{margin-right:auto;background:var(--bot)}
+    .meta{color:var(--muted);font-size:12px}
+    .pill{display:inline-block;background:#0e1624;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:999px;margin-left:6px}
+    .log{background:#0e1420;border:1px solid var(--border);border-radius:12px;padding:10px;height:120px;overflow:auto}
+    .tiny{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>CogMyra Chat Demo <span class="pill" id="ver">…</span></h1>
+
+    <div class="grid">
+      <div>
+        <div class="row"><label style="width:110px">API Base</label><input id="base" value="https://cogmyra-api.onrender.com" /></div>
+        <div class="row"><label style="width:110px">API Key</label><input id="key" placeholder="SERVER_API_KEY" /></div>
+        <div class="row"><label style="width:110px">Session ID</label><input id="sid" value="ui-chat-demo" /></div>
+        <div class="row"><label style="width:110px">Model</label><input id="model" value="gpt-4o-mini" /></div>
+      </div>
+      <div>
+        <div class="row"><label style="width:110px">Prompt</label><input id="prompt" value="Say hello briefly." /></div>
+        <div class="stack">
+          <button class="btn" id="send">Send (normal /api/chat)</button>
+          <button class="btn acc" id="stream">Stream (/api/chat/stream)</button>
+          <button class="btn warn" id="clear">Clear</button>
+        </div>
+        <div class="tiny">
+          Uses your <code>sessionId</code> so the API can keep short-term context server-side.
+          Click “Stream” to receive tokens live via SSE.
+        </div>
+      </div>
+    </div>
+
+    <div class="chat" id="chat"></div>
+
+    <div class="row"><div class="log" id="log"></div></div>
+  </div>
+
+<script>
+const $$ = (id)=>document.getElementById(id);
+const chatEl = $$('chat'), logEl = $$('log'), verEl=$$('ver');
+
+function log(msg){ logEl.textContent += (msg + '\n'); logEl.scrollTop = logEl.scrollHeight; }
+function addMsg(role, content){
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role==='user' ? 'me':'bot');
+  div.textContent = content;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+async function health(){
+  try{
+    const r = await fetch($$('base').value + '/api/health', { headers: { 'X-API-Key': $$('key').value }});
+    const j = await r.json();
+    verEl.textContent = j.version || 'unknown';
+  }catch(_){ verEl.textContent = 'offline?'; }
+}
+health();
+
+function payloadOf(prompt){
+  return {
+    sessionId: $$('sid').value.trim(),
+    model: $$('model').value.trim(),
+    messages: [{ role: 'user', content: prompt }]
+  };
+}
+
+// Normal POST /api/chat
+async function sendOnce(){
+  const base = $$('base').value.trim();
+  const key  = $$('key').value.trim();
+  const prompt = $$('prompt').value;
+
+  if(!prompt) return;
+  addMsg('user', prompt);
+  $$('prompt').value = '';
+
+  log('Sending /api/chat …');
+  const t0 = performance.now();
+  const res = await fetch(base + '/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+    body: JSON.stringify(payloadOf(prompt))
+  });
+
+  if(!res.ok){
+    const txt = await res.text().catch(()=> '');
+    log(`HTTP ${res.status}\n${txt}`);
+    addMsg('assistant', '(error)');
+    return;
+  }
+  const j = await res.json();
+  log(`HTTP ${res.status}`);
+  addMsg('assistant', j.reply || '(no text)');
+  if(j.usage?.total_tokens !== undefined){
+    addMsg('assistant', `\n— tokens: ${j.usage.total_tokens}`, 'meta');
+  }
+  log(`Done in ${Math.round(performance.now()-t0)} ms`);
+}
+
+// Streaming via /api/chat/stream (SSE)
+async function sendStream(){
+  const base = $$('base').value.trim();
+  const key  = $$('key').value.trim();
+  const prompt = $$('prompt').value;
+
+  if(!prompt) return;
+  addMsg('user', prompt);
+  $$('prompt').value = '';
+
+  log('Streaming /api/chat/stream …');
+  const t0 = performance.now();
+  const res = await fetch(base + '/api/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+    body: JSON.stringify(payloadOf(prompt))
+  });
+
+  if(!res.ok){
+    const txt = await res.text().catch(()=> '');
+    log(`HTTP ${res.status}\n${txt}`);
+    addMsg('assistant', '(error)');
+    return;
+  }
+
+  // Read the SSE stream
+  const reader = res.body.getReader();
+  const dec = new TextDecoder('utf-8');
+  let buffer = '', current = '';
+
+  const flush = () => {
+    if(current){
+      addMsg('assistant', current);
+      current = '';
+    }
+  };
+
+  while(true){
+    const { value, done } = await reader.read();
+    if(done) break;
+    buffer += dec.decode(value, { stream: true });
+
+    // split by lines
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? '';
+
+    for(const line of lines){
+      if(!line.trim()) continue;
+      if(line.startsWith('event:')){
+        // not needed here
+      }else if(line.startsWith('data:')){
+        const raw = line.slice(5).trim();
+        try{
+          const j = JSON.parse(raw);
+          if(j.delta){ current += j.delta; }
+          else if(j.final){ flush(); log(`HTTP 200`); log('Stream done.'); }
+          else if(j.error){ flush(); addMsg('assistant', `(error: ${j.error.message||'unknown'})`); }
+        }catch(e){
+          // ignore parsing errors
+        }
+      }
+    }
+  }
+  flush();
+  log(`Done in ${Math.round(performance.now()-t0)} ms`);
+}
+
+$$('send').onclick = sendOnce;
+$$('stream').onclick = sendStream;
+$$('clear').onclick = () => { chatEl.innerHTML=''; logEl.textContent=''; };
+
+</script>
+</body>
+</html>
