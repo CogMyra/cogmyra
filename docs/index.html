@@ -10,6 +10,9 @@
     <script type="module" crossorigin src="/assets/index-CtTwd_6l.js"></script>
   </head>
   <body>
+  <!-- include: header -->
+  <!--HEADER-->
     <div id="root"></div>
-  </body>
+    <script>fetch("/_header.html").then(r=>r.text()).then(h=>{document.body.innerHTML=document.body.innerHTML.replace("<!--HEADER-->",h)});</script>
+</body>
 </html>
