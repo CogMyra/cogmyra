@@ -43,7 +43,7 @@
   <script>
     (async () => {
       try {
-        const r = await fetch('/header.html?v=' + Date.now(), { cache: 'no-store' });
+        const r = await fetch('/header.html?v=dd615c6?v=' + Date.now(), { cache: 'no-store' });
         if (!r.ok) return;
         const html = await r.text();
         if (html.includes('<h1>404')) return;
@@ -84,7 +84,7 @@
       <aside class="card">
         <h3 style="margin-top:0">Tips</h3>
         <ul style="margin:0 0 10px 18px">
-          <li>Use <code>/header.html?v=TIMESTAMP</code> to bypass CDN cache.</li>
+          <li>Use <code>/header.html?v=dd615c6?v=TIMESTAMP</code> to bypass CDN cache.</li>
           <li>Pages are served from the <code>/docs</code> folder on the <code>main</code> branch.</li>
           <li>Add <code>docs/.nojekyll</code> so underscored files aren’t ignored.</li>
         </ul>

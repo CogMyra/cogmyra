@@ -25,7 +25,7 @@
   <script>
     (async () => {
       try {
-        const r = await fetch('/header.html', { cache: 'no-cache' });
+        const r = await fetch('/header.html?v=dd615c6', { cache: 'no-cache' });
         if (!r.ok) return;
         const html = await r.text();
         if (html.includes('<h1>404')) return;
