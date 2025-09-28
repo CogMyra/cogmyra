@@ -1,301 +1,74 @@
-// /public/guide/app.js
-// Minimal, dependency-free wiring for the Guide page.
-// Shows reply + (latency · tokens · version), pretty-prints logs,
-// supports temperature slider, model select, and API base picker.
-// Safe if some elements are missing: each hook is optional.
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CogMyra Guide</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif; background:#0b1220; color:#e6e9f2; }
+    .wrap { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin: 0 0 1rem; font-size: 1.75rem; }
+    .row { display:flex; gap:.75rem; flex-wrap:wrap; margin:.5rem 0; }
+    input, textarea, select, button { background:#0f1930; border:1px solid #1f2a48; color:#e6e9f2; border-radius:10px; padding:.6rem .8rem; }
+    input, select { height: 40px; }
+    textarea { width:100%; min-height:120px; resize:vertical; }
+    button { cursor:pointer; }
+    button:hover { border-color:#315fff; box-shadow:0 0 0 3px rgba(49,95,255,.15); }
+    .meta { opacity:.75; font-size:.9rem; margin-top:.25rem; }
+    pre { background:#0f1930; border:1px solid #1f2a48; border-radius:12px; padding:1rem; overflow:auto; max-height:40vh; }
+    label { opacity:.85; font-size:.9rem; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>CogMyra Guide</h1>
 
-// ---------- tiny DOM helpers
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+    <div class="row">
+      <label>API Key</label>
+      <input id="apiKey" type="password" placeholder="Enter your API key" style="flex:1; min-width:260px;" />
+    </div>
 
-// ---------- state helpers
-const LS = {
-  get(key, fallback = null) {
-    try {
-      const v = localStorage.getItem(key);
-      return v === null ? fallback : JSON.parse(v);
-    } catch {
-      return fallback;
-    }
-  },
-  set(key, value) {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch {}
-  },
-};
+    <div class="row grid">
+      <div>
+        <label>API Base</label>
+        <input id="apiBase" type="url" placeholder="https://cogmyra-api.onrender.com" />
+      </div>
+      <div>
+        <label>Model</label>
+        <select id="model">
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+        </select>
+      </div>
+    </div>
 
-// ---------- elements (all optional; we guard if missing)
-const el = {
-  sendBtn: $("#sendBtn"),
-  userInput: $("#userInput"),
-  reply: $("#reply"),
-  logsPre: $("#logsPre") || $("#logs") || $("#logsJson"),
-  temp: $("#temperature"),
-  tempLabel: $("#tempLabel"),
-  model: $("#model"),
-  apiBaseInput: $("#apiBase"), // <input type="url"> OR <select id="apiBase">
-  apiRadios: $$('input[name="apiBase"]'), // optional radio group
-  refreshBtn: $("#refreshLogs"), // used for quick health check
-  healthText: $("#apiStatus") || $("#health") || $("#healthText"),
-};
+    <div class="row">
+      <label>Temperature: <span id="tempLabel">1.0</span></label>
+      <input id="temperature" type="range" min="0" max="2" step="0.1" value="1.0" style="width:260px;" />
+      <label><input id="stream" type="checkbox" /> Stream</label>
+    </div>
 
-// ---------- config
-const DEFAULT_API = "https://cogmyra-api.onrender.com";
-const API_KEY = "guide.apiBase";
-const TEMP_KEY = "guide.temperature";
-const MODEL_KEY = "guide.model";
+    <div class="row">
+      <textarea id="userInput" placeholder="Type your message for the Guide…"></textarea>
+    </div>
 
-// ---------- utilities
-function getApiBase() {
-  // 1) radio group has priority
-  const checked = el.apiRadios.find((r) => r.checked);
-  if (checked?.value) return checked.value.trim();
+    <div class="row">
+      <button id="sendBtn">Send</button>
+    </div>
 
-  // 2) explicit input/select
-  const val = el.apiBaseInput?.value?.trim();
-  if (val) return val;
+    <section style="margin-top:1rem;">
+      <h2 style="font-size:1.1rem; margin:.5rem 0;">Reply</h2>
+      <div id="reply" style="background:#0f1930; border:1px solid #1f2a48; border-radius:12px; padding:1rem; min-height:80px;"></div>
+    </section>
 
-  // 3) localStorage or default
-  return LS.get(API_KEY, DEFAULT_API);
-}
+    <section style="margin-top:1rem;">
+      <h2 style="font-size:1.1rem; margin:.5rem 0;">Logs</h2>
+      <pre id="logsPre">{}</pre>
+    </section>
+  </main>
 
-function setApiBaseUI(value) {
-  // reflect into whichever controls exist
-  if (el.apiBaseInput) el.apiBaseInput.value = value;
-  if (el.apiRadios.length) {
-    el.apiRadios.forEach((r) => (r.checked = r.value === value));
-  }
-  LS.set(API_KEY, value);
-}
-
-function getTemperature() {
-  if (!el.temp) return null;
-  const v = parseFloat(el.temp.value);
-  return Number.isFinite(v) ? v : null;
-}
-
-function setTemperatureUI(v) {
-  if (!el.temp) return;
-  const clamped = Math.max(0, Math.min(2, Number(v) || 1.0));
-  el.temp.value = clamped;
-  if (el.tempLabel) el.tempLabel.textContent = clamped.toFixed(1);
-  LS.set(TEMP_KEY, clamped);
-}
-
-function getModel() {
-  if (!el.model) return "gpt-4.1";
-  return el.model.value || "gpt-4.1";
-}
-
-function setModelUI(v) {
-  if (!el.model) return;
-  el.model.value = v;
-  LS.set(MODEL_KEY, v);
-}
-
-function pretty(obj) {
-  try {
-    return JSON.stringify(obj, null, 2);
-  } catch {
-    return String(obj ?? "");
-  }
-}
-
-function setReplyText(text) {
-  if (!el.reply) return;
-  if ("value" in el.reply) {
-    el.reply.value = text;
-  } else {
-    el.reply.textContent = text;
-  }
-}
-
-function setLogs(obj) {
-  if (!el.logsPre) return;
-  const text = pretty(obj);
-  if ("value" in el.logsPre) {
-    el.logsPre.value = text;
-  } else {
-    el.logsPre.textContent = text;
-  }
-}
-
-function setBusy(busy) {
-  if (el.sendBtn) {
-    el.sendBtn.disabled = busy;
-    el.sendBtn.textContent = busy ? "Sending…" : "Send";
-  }
-}
-
-// ---------- network
-async function healthCheck() {
-  const base = getApiBase();
-  const urls = [`${base}/api/healthz`, `${base}/api/health`]; // try both
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { credentials: "include" });
-      if (!r.ok) continue;
-      const j = await r.json();
-      const ok =
-        j?.ok === "true" ||
-        j?.status === "ok" ||
-        j?.service === "cogmyra-api";
-      const ver = j?.version || j?.build || j?.service || "";
-      if (el.healthText) {
-        el.healthText.textContent = `API: ${ok ? "online" : "degraded"} • ${
-          ver || "unknown"
-        }`;
-      }
-      return { ok, version: ver, raw: j };
-    } catch {
-      // try next
-    }
-  }
-  if (el.healthText) el.healthText.textContent = "API: offline";
-  return { ok: false };
-}
-
-async function sendMessage() {
-  const base = getApiBase();
-  const model = getModel();
-  const temperature = getTemperature();
-  const content = (el.userInput?.value || "").trim();
-
-  if (!content) {
-    setReplyText("(type a message first)");
-    return;
-  }
-
-  setBusy(true);
-  setReplyText("…");
-  setLogs({ sending: true, model, temperature, content, base });
-
-  try {
-    const body = {
-      sessionId: "guide",
-      model,
-      messages: [{ role: "user", content }],
-    };
-    if (typeof temperature === "number") body.temperature = temperature;
-
-    const res = await fetch(`${base}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // harmless; server can ignore
-      body: JSON.stringify(body),
-    });
-
-    // Handle non-2xx
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(
-        `HTTP ${res.status} ${res.statusText}\n${txt || "(no body)"}`
-      );
-    }
-
-    const data = await res.json();
-
-    // Build meta suffix
-    const meta = [];
-    if (typeof data.latency_ms === "number") meta.push(`⏱ ${data.latency_ms} ms`);
-    if (data.usage && data.usage.total_tokens != null)
-      meta.push(`🔢 ${data.usage.total_tokens} tokens`);
-    if (data.version) meta.push(`🧩 ${data.version}`);
-    const suffix = meta.length ? `\n\n(${meta.join(" · ")})` : "";
-
-    setReplyText((data.reply || "(no reply)") + suffix);
-    setLogs(data);
-  } catch (err) {
-    const msg = (err && err.message) || String(err);
-    setReplyText("Request failed.");
-    setLogs({ error: msg });
-    console.error(err);
-  } finally {
-    setBusy(false);
-  }
-}
-
-// ---------- wiring
-function wireButtons() {
-  if (el.sendBtn) el.sendBtn.addEventListener("click", sendMessage);
-
-  // Enter-to-send (Shift+Enter = newline)
-  if (el.userInput) {
-    el.userInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        el.sendBtn?.click();
-      }
-    });
-  }
-
-  if (el.refreshBtn) {
-    el.refreshBtn.addEventListener("click", () => {
-      // fire & forget; healthCheck updates UI text
-      healthCheck();
-    });
-  }
-}
-
-function wireTempLabel() {
-  if (!el.temp) return;
-  // init from LS or current input value
-  const saved = LS.get(TEMP_KEY, null);
-  setTemperatureUI(saved ?? el.temp.value ?? 1.0);
-
-  el.temp.addEventListener("input", (e) => {
-    setTemperatureUI(e.target.value);
-  });
-}
-
-function wireModelPicker() {
-  if (!el.model) return;
-  const saved = LS.get(MODEL_KEY, null);
-  if (saved) setModelUI(saved);
-
-  el.model.addEventListener("change", (e) => {
-    setModelUI(e.target.value);
-  });
-}
-
-function wireApiPicker() {
-  // prefer saved base, then current control value, then default
-  const saved = LS.get(API_KEY, null);
-  const initial = saved || getApiBase() || DEFAULT_API;
-  setApiBaseUI(initial);
-
-  // input/select
-  if (el.apiBaseInput) {
-    el.apiBaseInput.addEventListener("change", (e) => {
-      const val = (e.target.value || "").trim() || DEFAULT_API;
-      setApiBaseUI(val);
-      // refresh health status when base changes
-      healthCheck();
-    });
-  }
-
-  // radios
-  if (el.apiRadios.length) {
-    el.apiRadios.forEach((r) =>
-      r.addEventListener("change", (e) => {
-        if (e.target.checked) {
-          setApiBaseUI(e.target.value);
-          healthCheck();
-        }
-      })
-    );
-  }
-}
-
-// ---------- init
-function init() {
-  wireButtons();
-  wireTempLabel();
-  wireModelPicker();
-  wireApiPicker();
-  // one-time health ping (mirrors your "$('#refreshLogs')?.click()" behavior)
-  healthCheck();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+  <script src="./app.js"></script>
+</body>
+</html>
