@@ -1,56 +1,43 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+
   <title>CogMyra — Your Personalized AI Learning Coach</title>
+  <link rel="stylesheet" href="/site.css">
 
   <!-- Favicon -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
-  <link rel="apple-touch-icon" href="/favicon.svg"/>
-  <meta name="theme-color" content="#0b1220"/>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <meta name="theme-color" content="#0b1220" />
 
-  <!-- SEO -->
-  <meta name="description" content="CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you.">
+  <!-- Canonical -->
   <link rel="canonical" href="https://cogmyra.com/">
 
+  <!-- Description -->
+  <meta name="description" content="CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you.">
+
   <!-- Open Graph -->
-  <meta property="og:title" content="CogMyra — Your Personalized AI Learning Coach"/>
-  <meta property="og:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you."/>
-  <meta property="og:type" content="website"/>
-  <meta property="og:url" content="https://cogmyra.com/"/>
-  <meta property="og:image" content="https://cogmyra.com/og-home-1200x630.jpg"/>
+  <meta property="og:title" content="CogMyra — Your Personalized AI Learning Coach" />
+  <meta property="og:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cogmyra.com/" />
+  <meta property="og:image" content="https://cogmyra.com/og-home-1200x630.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
 
   <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:title" content="CogMyra — Your Personalized AI Learning Coach"/>
-  <meta name="twitter:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you."/>
-  <meta name="twitter:image" content="https://cogmyra.com/og-home-1200x630.jpg"/>
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CogMyra — Your Personalized AI Learning Coach" />
+  <meta name="twitter:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you." />
+  <meta name="twitter:image" content="https://cogmyra.com/og-home-1200x630.jpg" />
 
-  <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#9fb3d9; --accent:#5aa3ff; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
-      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
-    .wrap { max-width:980px; margin:48px auto; padding:0 20px; }
-    .badge { display:inline-block; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
-      color:var(--accent); background:#0f1a30; border:1px solid #183055; padding:6px 10px; border-radius:999px; }
-    h1 { font-size:42px; line-height:1.15; margin:14px 0 8px; }
-    p.lead { font-size:18px; color:var(--muted); margin:0 0 14px; }
-    .row { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; }
-    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:14px; }
-    .btn { display:inline-block; padding:10px 14px; border-radius:10px; background:var(--accent);
-      color:#051024; text-decoration:none; font-weight:600; }
-    .btn.secondary { background:transparent; color:var(--fg); border:1px solid #2a3b5f; }
-    .grid3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-    .small { font-size:12px; color:#b5c6ea; }
-    code { background:#0e1727; padding:2px 6px; border-radius:6px; border:1px solid #24385e; }
-    @media (max-width:780px) { .grid3 { grid-template-columns:1fr; } }
-  </style>
-
+  <!-- Load shared header -->
   <script>
     (async () => {
       try {
-        const r = await fetch('/header.html?v=site', { cache: 'no-cache' });
+        const r = await fetch('/header.html?v={{REV}}', { cache: 'no-cache' });
         if (!r.ok) return;
         const html = await r.text();
         if (html.includes('<h1>404')) return;
@@ -60,33 +47,52 @@
   </script>
 </head>
 <body>
-  <main class="wrap">
-    <span class="badge">Learning, faster</span>
-    <h1>Your Personalized AI<br/>Learning Coach</h1>
-    <p class="lead">CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you. Sign in with a magic link and start chatting with your guide in seconds.</p>
-
-    <div style="display:flex;gap:12px;margin:14px 0 22px;">
-      <a class="btn" href="/guide/">Try the Guide</a>
-      <a class="btn secondary" href="#how">How it works →</a>
-    </div>
-
-    <p class="small" style="margin:0 0 20px">API Base: <code>https://cogmyra-api.onrender.com</code></p>
-
-    <div class="row">
-      <aside class="card" style="flex:1; min-width:260px;">
-        <div class="small" style="opacity:.8;margin-bottom:6px">Preview</div>
-        <div class="card" style="margin-bottom:10px"><b>You</b><br/>Explain photosynthesis like I’m 12.</div>
-        <div class="card"><b>CogMyra</b><br/>Think of leaves as tiny solar panels. They take in sunlight, water, and carbon dioxide and turn that into food for the plant and oxygen for us…</div>
-      </aside>
-
-      <section id="how" class="card" style="flex:2; min-width:300px;">
-        <div class="grid3">
-          <div class="card"><b>Fast sign-in</b><br/><span class="small">Passwordless magic link—just your email.</span></div>
-          <div class="card"><b>Personalized help</b><br/><span class="small">A guide that adapts to your level.</span></div>
-          <div class="card"><b>Built for learning</b><br/><span class="small">Explanations, practice, and feedback—saved to your account.</span></div>
+  <main class="container">
+    <div class="row" style="align-items:center;gap:28px">
+      <section>
+        <span class="badge">Learning, faster</span>
+        <h1>Your Personalized AI<br/>Learning Coach</h1>
+        <p class="lead">
+          CogMyra helps you learn faster with clear explanations,
+          practice, and feedback that adapts to you. Sign in with a magic link
+          and start chatting with your guide in seconds.
+        </p>
+        <div style="display:flex;gap:12px;margin-top:14px">
+          <a class="btn" href="/guide/">Try the Guide</a>
+          <a class="btn secondary" href="#how">How it works →</a>
         </div>
+        <p class="small" style="margin-top:10px">
+          API Base: <code>https://cogmyra-api.onrender.com</code>
+        </p>
       </section>
+
+      <aside class="card">
+        <div class="small" style="opacity:.8;margin-bottom:6px">Preview</div>
+        <div class="card" style="margin-bottom:10px">
+          <b>You</b><br/>Explain photosynthesis like I’m 12.
+        </div>
+        <div class="card">
+          <b>CogMyra</b><br/>Think of leaves as tiny solar panels. They take in sunlight, water, and carbon dioxide and turn that into food for the plant and oxygen for us…
+        </div>
+      </aside>
     </div>
+
+    <section id="how" style="margin-top:36px">
+      <div class="grid3">
+        <div class="card">
+          <b>Fast sign-in</b><br/>
+          <span class="small">Passwordless magic link—just your email.</span>
+        </div>
+        <div class="card">
+          <b>Personalized help</b><br/>
+          <span class="small">A guide that adapts to your level.</span>
+        </div>
+        <div class="card">
+          <b>Built for learning</b><br/>
+          <span class="small">Explanations, practice, and feedback—saved to your account.</span>
+        </div>
+      </div>
+    </section>
   </main>
 </body>
 </html>

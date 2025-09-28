@@ -1,124 +1,31 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Guide — CogMyra</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CogMyra Guide – Your AI Learning Coach</title>
 
-  <!-- Self-contained styles -->
-  <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#9fb3d9; --accent:#5aa3ff; }
-    html,body { margin:0; padding:0; background:var(--bg); color:var(--fg);
-      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif; }
-    .wrap { max-width:1000px; margin:52px auto; padding:0 18px; }
-    .card { background:#0f1829; border:1px solid #21314f; border-radius:14px; padding:22px; }
-    h1 { margin:0 0 8px; font-size:32px; }
-    p.muted { color:var(--muted); margin:0 0 16px; }
-    .row { display:grid; gap:16px; grid-template-columns: 1.2fr .8fr }
-    @media (max-width:900px){ .row{ grid-template-columns:1fr } }
-    .btn { display:inline-block; padding:10px 14px; border-radius:10px; background:var(--accent);
-      color:#051024; font-weight:600; text-decoration:none; border:1px solid #315fff; }
-    .btn.secondary { background:transparent; color:var(--fg); border:1px solid #2a3b5f; }
-    pre { white-space:pre-wrap; word-break:break-word; background:#0e1727; border:1px solid #24385e; border-radius:10px; padding:12px; }
-    label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
-    input { width:100%; background:#0e1727; border:1px solid #24385e; color:var(--fg); border-radius:8px; padding:10px; }
-  </style>
+    <!-- Primary SEO -->
+    <meta name="description" content="Try the CogMyra Guide: your personalized AI learning coach. Get instant explanations, practice, and feedback tailored to you." />
 
-  <!-- Social meta -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
-  <link rel="apple-touch-icon" href="/favicon.svg"/>
-  <meta name="theme-color" content="#0b1220"/>
-  <meta property="og:title" content="CogMyra — Guide"/>
-  <meta property="og:description" content="Try the CogMyra API health check and see how to get started."/>
-  <meta property="og:type" content="website"/>
-  <meta property="og:url" content="https://cogmyra.com/guide/"/>
-  <meta property="og:image" content="https://cogmyra.com/vite.svg"/>
-  <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:title" content="CogMyra — Guide"/>
-  <meta name="twitter:description" content="Try the CogMyra API health check and see how to get started."/>
-  <meta name="twitter:image" content="https://cogmyra.com/vite.svg"/>
-</head>
-<body>
-  <!-- Lightweight header injection (cache-busted) -->
-  <script>
-    (async () => {
-      try {
-        const r = await fetch('/header.html?v=dd615c6?v=' + Date.now(), { cache: 'no-store' });
-        if (!r.ok) return;
-        const html = await r.text();
-        if (html.includes('<h1>404')) return;
-        document.body.insertAdjacentHTML('afterbegin', html);
-      } catch {}
-    })();
-  </script>
+    <!-- Open Graph -->
+    <meta property="og:title" content="CogMyra Guide – Your AI Learning Coach" />
+    <meta property="og:description" content="Try the CogMyra Guide: your personalized AI learning coach. Get instant explanations, practice, and feedback tailored to you." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cogmyra.com/guide/" />
+    <meta property="og:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
 
-  <main class="wrap">
-    <div class="card" style="margin-bottom:16px">
-      <h1>Guide</h1>
-      <p class="muted">Quick health check for the API and notes to get you started.</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <a class="btn" href="/">← Back Home</a>
-        <a class="btn secondary" href="mailto:hello@cogmyra.com">Contact</a>
-      </div>
-    </div>
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CogMyra Guide – Your AI Learning Coach" />
+    <meta name="twitter:description" content="Try the CogMyra Guide: your personalized AI learning coach. Get instant explanations, practice, and feedback tailored to you." />
+    <meta name="twitter:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
 
-    <div class="row">
-      <section class="card">
-        <h2 style="margin-top:0">API Health Check</h2>
-        <p class="muted">Ping the API from your browser. Update the base or path if yours differs.</p>
-
-        <label for="apiBase">API Base</label>
-        <input id="apiBase" value="https://cogmyra-api.onrender.com"/>
-
-        <label for="healthPath">Health Path</label>
-        <input id="healthPath" value="/health"/>
-
-        <div style="display:flex;gap:10px;margin:12px 0 6px">
-          <button id="pingBtn" class="btn" type="button">Ping API</button>
-          <button id="clearBtn" class="btn secondary" type="button">Clear</button>
-        </div>
-
-        <pre id="out">Click “Ping API”.</pre>
-      </section>
-
-      <aside class="card">
-        <h3 style="margin-top:0">Tips</h3>
-        <ul style="margin:0 0 10px 18px">
-          <li>Use <code>/header.html?v=dd615c6?v=TIMESTAMP</code> to bypass CDN cache.</li>
-          <li>Pages are served from the <code>/docs</code> folder on the <code>main</code> branch.</li>
-          <li>Add <code>docs/.nojekyll</code> so underscored files aren’t ignored.</li>
-        </ul>
-        <p class="muted" style="margin:0">Need help? Email <a href="mailto:hello@cogmyra.com">hello@cogmyra.com</a>.</p>
-      </aside>
-    </div>
-  </main>
-
-  <script>
-    const out = document.getElementById('out');
-    const btn = document.getElementById('pingBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const apiBaseEl = document.getElementById('apiBase');
-    const healthEl = document.getElementById('healthPath');
-
-    clearBtn.onclick = () => { out.textContent = 'Click “Ping API”.'; };
-
-    btn.onclick = async () => {
-      const API_BASE = (apiBaseEl.value || '').replace(/\/+$/,'');
-      const HEALTH_PATH = (healthEl.value || '').startsWith('/') ? healthEl.value : '/'+healthEl.value;
-
-      const url = API_BASE + HEALTH_PATH;
-      out.textContent = 'Pinging…\n' + url;
-
-      try {
-        const res = await fetch(url, { mode: 'cors' });
-        const ct = (res.headers.get('content-type') || '').toLowerCase();
-        const body = ct.includes('application/json') ? JSON.stringify(await res.json(), null, 2)
-                                                     : await res.text();
-        out.textContent = `GET ${url}\nStatus: ${res.status}\n\n${body}`;
-      } catch (e) {
-        out.textContent = `Request failed: ${url}\n\n${e && e.message ? e.message : String(e)}`;
-      }
-    };
-  </script>
-</body>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>
