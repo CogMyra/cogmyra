@@ -1,71 +1,113 @@
-// ============ Config ============
+// --- Config ---
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
+const APP_KEY    = "abc123"; // must match FRONTEND_APP_KEY in your Worker
 
-// This must equal your Wrangler secret FRONTEND_APP_KEY
-const APP_KEY = "abc123";
+// --- DOM ---
+const feedEl     = document.querySelector(".feed");
+const inputEl    = document.querySelector(".composer input");
+const sendBtn    = document.querySelector(".composer button.primary");
 
-// ============ Elements ============
-const feed   = document.getElementById("feed");
-const input  = document.getElementById("composer-input");
-const send   = document.getElementById("send-btn");
-const threads = document.getElementById("threads");
+// --- Simple state (persisted) ---
+const STORAGE_KEY = "cogmyra.thread.v1";
+let thread = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
 
-// ============ Helpers ============
-function appendMessage(role, text, cls = "") {
-  const div = document.createElement("div");
-  div.className = `msg ${role} ${cls}`.trim();
-  div.textContent = text;
-  feed.appendChild(div);
-  feed.scrollTop = feed.scrollHeight;
-  return div;
+// --- Helpers ---
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(thread)); }
+
+function bubble(role, text = "") {
+  const el = document.createElement("div");
+  el.className = `msg ${role}`;
+  el.textContent = text;
+  feedEl.appendChild(el);
+  feedEl.scrollTop = feedEl.scrollHeight;
+  return el;
 }
 
-// ============ Events ============
-send.addEventListener("click", async () => {
-  const text = input.value.trim();
-  if (!text) return;
-  
-  // Show user message
-  appendMessage("user", text);
-  input.value = "";
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-  // Show placeholder for CogMyra reply
-  const msgDiv = appendMessage("assistant", "…");
+// Typewriter: strict per-char
+async function typewriter(el, text, delay = 15) {
+  el.textContent = "";
+  for (let i = 0; i < text.length; i++) {
+    el.textContent += text[i];
+    // keep scrolled to bottom while we type
+    feedEl.scrollTop = feedEl.scrollHeight;
+    await sleep(delay);
+  }
+}
+
+async function sendChat(userText) {
+  const res = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-app-key": APP_KEY
+    },
+    body: JSON.stringify({ messages: [{ role: "user", content: userText }] })
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(()=>"");
+    throw new Error(`HTTP ${res.status} ${res.statusText} ${err}`);
+  }
+
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content || "(no content)";
+  return content;
+}
+
+// --- Wire UI ---
+async function handleSend() {
+  const userText = inputEl.value.trim();
+  if (!userText) return;
+
+  // Add user bubble immediately
+  const u = bubble("user", userText);
+  thread.push({ role: "user", content: userText });
+  save();
+
+  inputEl.value = "";
+  inputEl.focus();
+
+  // Placeholder assistant bubble we will type into
+  const a = bubble("assistant", "…");
 
   try {
-    const res = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-app-key": APP_KEY
-      },
-      body: JSON.stringify({
-        messages: [{ role: "user", content: text }]
-      })
-    });
+    const reply = await sendChat(userText);
 
-    if (!res.ok) {
-      msgDiv.textContent = `Error: ${res.status}`;
-      msgDiv.classList.add("error");
-      return;
-    }
+    // typewriter effect into assistant bubble
+    await typewriter(a, reply, 12);
 
-    const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || "(no reply)";
-    msgDiv.textContent = reply;
-
-  } catch (err) {
-    msgDiv.textContent = `Network error: ${err.message}`;
-    msgDiv.classList.add("error");
+    thread.push({ role: "assistant", content: reply });
+    save();
+  } catch (e) {
+    a.classList.add("error");
+    a.textContent = `Error: ${e.message}`;
+    thread.push({ role: "assistant", content: a.textContent, error: true });
+    save();
   }
-});
+}
 
-// Allow pressing Enter to send
-input.addEventListener("keypress", (e) => {
+// Enter key
+inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    send.click();
+    handleSend();
   }
 });
+
+// Click send
+sendBtn.addEventListener("click", handleSend);
+
+// --- Boot: render any stored thread & a greeting once ---
+(function boot() {
+  if (thread.length === 0) {
+    bubble("assistant", "Hello, I’m CogMyra.");
+    return;
+  }
+  for (const m of thread) {
+    bubble(m.role, m.content);
+  }
+})();
