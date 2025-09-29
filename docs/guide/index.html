@@ -1,59 +1,49 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   <title>CogMyra Guide</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- CSS -->
-  <link rel="stylesheet" href="/guide/styles.css?v=3" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Link to custom stylesheet -->
+  <link rel="stylesheet" href="/guide/styles.css?v=3">
 </head>
 <body>
-  <!-- Top bar -->
-  <div class="topbar">
+  <div class="topbar"> 
     <div class="brand">
       <div class="avatar">CM</div>
       <div>
-        <div class="title">CogMyra</div>
+        <div class="title">CogMyra</div> 
         <div class="subtitle">Guide</div>
       </div>
     </div>
-
-    <div style="display:flex; gap:10px; align-items:center;">
-      <div id="health" class="health-line">
-        <span id="healthDot" class="dot dot-muted"></span>
-        <span id="healthText">Checking…</span>
-        <span id="modelTag" class="subtitle" style="margin-left:8px;"></span>
-      </div>
-      <button id="newChatBtn" class="primary">New Chat</button>
-    </div>
+    <button class="primary" id="new-chat">New Chat</button>
   </div>
-
-  <!-- Shell -->
+  
   <div class="shell">
-    <!-- History rail -->
+    <!-- History rail -->  
     <aside class="history">
       <div class="section-title">History</div>
-      <div id="threads" class="threads"></div>
-
-      <div class="rail-footer">
-        <button id="pingBtn" class="ghost">Ping health</button>
+      <div class="threads" id="threads"></div>
+      <div class="rail-footer">  
+        <div class="health-line">
+          <span class="dot dot-ok"></span> Healthy
+        </div>
       </div>
     </aside>
-
+    
     <!-- Chat panel -->
-    <main class="chat">
-      <div id="feed" class="feed">
-        <div class="msg assistant">Hello! I’m CogMyra. Ask me anything.</div>
+    <main class="chat"> 
+      <div class="feed" id="feed">
+        <div class="msg assistant">Hello, I’m CogMyra.</div>
       </div>
-
       <div class="composer">
-        <input id="composerInput" type="text" placeholder="Type a message…" />
-        <button id="sendBtn" class="primary">Send</button>
+        <input type="text" id="composer-input" placeholder="Type a message…" />
+        <button class="primary" id="send-btn">Send</button>
       </div>
     </main>
   </div>
 
-  <!-- App JS -->
-  <script type="module" src="/guide/app.js?v=3"></script>
+  <!-- Load app.js -->
+  <script src="/guide/app.js?v=3"></script>
 </body>
 </html>
