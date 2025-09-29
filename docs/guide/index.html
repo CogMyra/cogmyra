@@ -1,13 +1,14 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>CogMyra Guide</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Link to your custom stylesheet -->
-  <link rel="stylesheet" href="/guide/styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Stylesheet served from /guide/styles.css on your site -->
+  <link rel="stylesheet" href="/guide/styles.css?v=3" />
 </head>
 <body>
+  <!-- Top bar -->
   <div class="topbar">
     <div class="brand">
       <div class="avatar">CM</div>
@@ -16,35 +17,49 @@
         <div class="subtitle">Guide</div>
       </div>
     </div>
-    <button class="primary">New Chat</button>
+    <div style="display:flex; gap:8px">
+      <button id="new-chat" class="primary">New Chat</button>
+      <button id="clear-history" class="ghost">Clear</button>
+    </div>
   </div>
 
+  <!-- Shell -->
   <div class="shell">
     <!-- History rail -->
     <aside class="history">
       <div class="section-title">History</div>
-      <div class="threads">
-        <div class="thread">Example Thread 1</div>
-        <div class="thread">Example Thread 2</div>
+      <div id="threads" class="threads">
+        <!-- Filled by app.js -->
       </div>
       <div class="rail-footer">
         <div class="health-line">
-          <span class="dot dot-ok"></span> Healthy
+          <span id="health-dot" class="dot dot-muted"></span>
+          <span id="health-text">Checking…</span>
         </div>
       </div>
     </aside>
 
     <!-- Chat panel -->
     <main class="chat">
-      <div class="feed">
-        <div class="msg assistant">Hello, I’m CogMyra.</div>
-        <div class="msg user">Hi!</div>
+      <!-- Feed -->
+      <div id="feed" class="feed">
+        <!-- Filled by app.js -->
       </div>
+
+      <!-- Composer -->
       <div class="composer">
-        <input type="text" placeholder="Type a message…" />
-        <button class="primary">Send</button>
+        <input
+          id="composer-input"
+          type="text"
+          placeholder="Type a message…"
+          autocomplete="off"
+        />
+        <button id="send-btn" class="primary">Send</button>
       </div>
     </main>
   </div>
+
+  <!-- App code (must be last so DOM exists) -->
+  <script src="/guide/app.js" defer></script>
 </body>
 </html>

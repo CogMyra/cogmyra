@@ -1,200 +1,182 @@
-// =================== CONFIG ===================
+/* CogMyra Guide — app.js (v3)
+   Wires up the new HTML ids and talks to your Cloudflare Worker.
+   - Click Send or press Enter to send a message
+   - “New Chat” creates a fresh session
+   - Health shows model + prompt hash from proxy headers
+*/
+
+//// ---- Config ----
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
 
-// This must equal your Wrangler secret FRONTEND_APP_KEY
+// Must match your Worker secret FRONTEND_APP_KEY
 const APP_KEY = "abc123";
 
-// Shared headers
-const COMMON_HEADERS = {
-  "content-type": "application/json",
-  "x-app-key": APP_KEY,
+// Session: one per browser tab unless you press “New Chat”
+let SESSION_ID = localStorage.getItem("cm.sessionId") || `cm-${Date.now()}`;
+localStorage.setItem("cm.sessionId", SESSION_ID);
+
+//// ---- DOM ----
+const el = {
+  feed: document.getElementById("feed"),
+  input: document.getElementById("composer-input"),
+  send: document.getElementById("send-btn"),
+  threads: document.getElementById("threads"),
+  newChat: document.getElementById("new-chat"),
+  clearHistory: document.getElementById("clear-history"),
+  healthDot: document.getElementById("health-dot"),
+  healthText: document.getElementById("health-text"),
 };
 
-// =================== ELEMENTS ===================
-const els = {
-  history:  document.getElementById("history"),
-  messages: document.getElementById("messages"),
-  input:    document.getElementById("input"),
-  send:     document.getElementById("send"),
-  check:    document.getElementById("check"),
-  health:   document.getElementById("health"),
-};
+//// ---- Utilities ----
+function bubble(role, text, opts = {}) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}${opts.error ? " error" : ""}`;
+  div.textContent = text;
+  el.feed.appendChild(div);
+  el.feed.scrollTop = el.feed.scrollHeight;
+  return div;
+}
 
-// Minimal local “threads”
-const store = {
-  key: "cm.guide.threads",
-  all() { try { return JSON.parse(localStorage.getItem(this.key) || "[]"); } catch { return []; } },
-  save(list) { localStorage.setItem(this.key, JSON.stringify(list)); },
-  upsert(thread) {
-    const list = this.all();
-    const i = list.findIndex(t => t.id === thread.id);
-    if (i >= 0) list[i] = thread; else list.unshift(thread);
-    this.save(list);
-  }
-};
+function setHealth(status, text) {
+  el.healthText.textContent = text;
+  el.healthDot.classList.remove("dot-ok", "dot-bad", "dot-muted");
+  el.healthDot.classList.add(
+    status === "ok" ? "dot-ok" : status === "bad" ? "dot-bad" : "dot-muted"
+  );
+}
 
-let current = null; // {id,title,messages:[{role,content,ts}]}
+function saveThreadPreview(latestUserText = "") {
+  try {
+    const list = JSON.parse(localStorage.getItem("cm.threads") || "[]");
+    const idx = list.findIndex((t) => t.id === SESSION_ID);
+    const preview = latestUserText || list[idx]?.preview || "New conversation";
+    const entry = { id: SESSION_ID, ts: Date.now(), preview };
+    if (idx >= 0) list[idx] = entry; else list.unshift(entry);
+    localStorage.setItem("cm.threads", JSON.stringify(list.slice(0, 30)));
+    renderThreads();
+  } catch {}
+}
 
-// =================== UI HELPERS ===================
-function el(tag, attrs = {}, ...children) {
-  const n = document.createElement(tag);
-  Object.entries(attrs).forEach(([k,v]) => {
-    if (k === "class") n.className = v;
-    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
-    else n.setAttribute(k, v);
+function renderThreads() {
+  const list = JSON.parse(localStorage.getItem("cm.threads") || "[]");
+  el.threads.innerHTML = "";
+  list.forEach(({ id, preview }) => {
+    const item = document.createElement("button");
+    item.className = "thread";
+    item.textContent = preview || id;
+    item.onclick = () => {
+      SESSION_ID = id;
+      localStorage.setItem("cm.sessionId", SESSION_ID);
+      // soft reset the UI for now (no persistence of feed bubbles)
+      el.feed.innerHTML = "";
+      bubble("assistant", "Picked thread: " + (preview || id));
+    };
+    el.threads.appendChild(item);
   });
-  children.forEach(c => n.append(c));
-  return n;
 }
 
-function renderThreadList() {
-  const list = store.all();
-  const wrap = els.history.querySelector(".scroll");
-  if (!wrap) return;
-  wrap.innerHTML = "";
-  list.forEach(t => {
-    const btn = el("button", { class: "btn block", onclick: () => openThread(t.id) }, t.title || "Chat");
-    wrap.append(btn);
-  });
+function headers() {
+  return {
+    "content-type": "application/json",
+    "x-app-key": APP_KEY,
+  };
 }
 
-function openThread(id) {
-  const t = store.all().find(x => x.id === id);
-  if (!t) return;
-  current = t;
-  drawMessages();
-}
-
-function newThread() {
-  current = { id: "t_" + Math.random().toString(36).slice(2), title: "New Chat", messages: [] };
-  store.upsert(current);
-  renderThreadList();
-  drawMessages();
-}
-
-function drawMessages() {
-  const m = els.messages;
-  m.innerHTML = "";
-  if (!current) return;
-  current.messages.forEach(msg => {
-    const bubble = el("div", { class: "bubble " + (msg.role === "user" ? "user" : "ai") }, msg.content);
-    m.append(bubble);
-  });
-  m.scrollTop = m.scrollHeight;
-}
-
-function showError(text) {
-  const bubble = el("div", { class: "bubble ai" }, `⚠️ ${text}`);
-  els.messages.append(bubble);
-  els.messages.scrollTop = els.messages.scrollHeight;
-}
-
-// =================== NETWORK ===================
-
-// Health check (button at bottom-left)
+//// ---- Health check (on load & every 60s) ----
 async function checkHealth() {
-  els.health.textContent = "Checking…";
+  setHealth("muted", "Checking…");
   try {
-    const r = await fetch(HEALTH_URL, { headers: COMMON_HEADERS, mode: "cors", method: "GET" });
-    const txt = await r.text(); // show raw so CORS/status are obvious
-    els.health.textContent = `Health ${r.status}: ${txt}`;
-    console.log("[health] status:", r.status, "raw:", txt);
-  } catch (e) {
-    els.health.textContent = "Health error";
-    console.error("[health] error:", e);
+    const res = await fetch(HEALTH_URL, { headers: headers() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // Read exposed headers to confirm the proxy is applying your config
+    const hModel = res.headers.get("X-CogMyra-Model");
+    const hPrompt = res.headers.get("X-CogMyra-Prompt-Hash");
+    const extras = [];
+    if (hModel) extras.push(hModel);
+    if (hPrompt) extras.push(hPrompt.slice(0, 8) + "…");
+    setHealth("ok", extras.length ? `Healthy • ${extras.join(" • ")}` : "Healthy");
+    return data;
+  } catch (err) {
+    console.error("[health] fail:", err);
+    setHealth("bad", "Health check failed");
   }
 }
 
-// Main chat call — no AbortController, detailed error reporting
-async function sendToAPI(messages) {
-  // Defensive JSON build
-  const body = JSON.stringify({ messages });
-
-  let resp;
-  try {
-    resp = await fetch(CHAT_URL, {
-      method: "POST",
-      mode: "cors",
-      headers: COMMON_HEADERS,
-      body
-    });
-  } catch (e) {
-    // Network-layer error (DNS, CORS cancellation, offline, etc.)
-    console.error("[chat] fetch threw:", e);
-    throw new Error("Failed to reach API (network/CORS). See console.");
-  }
-
-  // Read body as text first so we can log non-JSON error payloads
-  const raw = await resp.text();
-  console.log("[chat] status:", resp.status, "raw:", raw);
-
-  if (!resp.ok) {
-    // Our Worker returns JSON on 401 with providedLength; show it if present
-    try {
-      const j = JSON.parse(raw);
-      const reason = j.reason ? ` (${j.reason})` : "";
-      const pl = typeof j.providedLength === "number" ? `, providedLength=${j.providedLength}` : "";
-      throw new Error(`API ${resp.status}: ${j.error || "error"}${reason}${pl}`);
-    } catch {
-      throw new Error(`API ${resp.status}: ${raw || "Unknown error"}`);
-    }
-  }
-
-  // Parse OpenAI-like JSON
-  try {
-    const data = JSON.parse(raw);
-    const content = data?.choices?.[0]?.message?.content ?? "(no content)";
-    return content;
-  } catch (e) {
-    console.error("[chat] JSON parse error:", e, "raw:", raw);
-    throw new Error("Invalid JSON from API (see console).");
-  }
-}
-
-// =================== EVENTS ===================
-async function onSend() {
-  const text = (els.input.value || "").trim();
+//// ---- Send message ----
+async function sendMessage() {
+  const text = el.input.value.trim();
   if (!text) return;
-  if (!current) newThread();
 
-  current.messages.push({ role: "user", content: text, ts: Date.now() });
-  store.upsert(current);
-  els.input.value = "";
-  drawMessages();
+  // UI: add user bubble
+  bubble("user", text);
+  saveThreadPreview(text);
+  el.input.value = "";
+  el.input.focus();
+  el.send.disabled = true;
 
   try {
-    const reply = await sendToAPI(current.messages);
-    current.messages.push({ role: "assistant", content: reply, ts: Date.now() });
-    store.upsert(current);
-    drawMessages();
-  } catch (e) {
-    showError(String(e.message || e));
+    const body = {
+      sessionId: SESSION_ID,
+      messages: [{ role: "user", content: text }],
+      // You can pass a model here to override, but proxy already enforces one.
+      // model: "gpt-4o-mini-2024-07-18"
+    };
+
+    const res = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(body),
+    });
+
+    // Auth / errors
+    if (res.status === 401) {
+      bubble("assistant", "Unauthorized — check your APP_KEY vs FRONTEND_APP_KEY.", { error: true });
+      return;
+    }
+    if (!res.ok) {
+      const raw = await res.text().catch(() => "");
+      bubble("assistant", `Error ${res.status}: ${raw || "Request failed"}`, { error: true });
+      return;
+    }
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || "(no content)";
+    bubble("assistant", content);
+  } catch (err) {
+    console.error("[chat] error:", err);
+    bubble("assistant", "Network error. See console for details.", { error: true });
+  } finally {
+    el.send.disabled = false;
   }
 }
 
-function wireUI() {
-  // Build left pane if not present
-  if (!els.history.querySelector(".scroll")) {
-    const pane = document.createElement("div");
-    pane.className = "history panel";
-    els.history.appendChild(pane);
+//// ---- Events ----
+el.send.addEventListener("click", sendMessage);
+el.input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
   }
-  if (!document.getElementById("new-thread-btn")) {
-    const header = el("div", { style: "padding:12px; border-bottom:1px solid #24304b;" }, el("h3", {}, "History"));
-    const scroll = el("div", { class: "scroll" });
-    els.history.innerHTML = "";
-    els.history.append(header, scroll, el("button", { id: "new-thread-btn", class: "btn block", onclick: newThread }, "+ New Chat"));
-  }
+});
 
-  els.send.addEventListener("click", onSend);
-  els.input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }});
-  if (els.check) els.check.addEventListener("click", checkHealth);
+el.newChat?.addEventListener("click", () => {
+  SESSION_ID = `cm-${Date.now()}`;
+  localStorage.setItem("cm.sessionId", SESSION_ID);
+  el.feed.innerHTML = "";
+  bubble("assistant", "New chat started.");
+  saveThreadPreview("");
+});
 
-  // Initial state
-  renderThreadList();
-  if (!store.all().length) newThread();
-}
+el.clearHistory?.addEventListener("click", () => {
+  localStorage.removeItem("cm.threads");
+  renderThreads();
+  bubble("assistant", "History cleared.");
+});
 
-document.addEventListener("DOMContentLoaded", wireUI);
+//// ---- Boot ----
+renderThreads();
+checkHealth();
+setInterval(checkHealth, 60_000);
