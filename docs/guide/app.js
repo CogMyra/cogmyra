@@ -1,182 +1,159 @@
-/* CogMyra Guide — app.js (v3)
-   Wires up the new HTML ids and talks to your Cloudflare Worker.
-   - Click Send or press Enter to send a message
-   - “New Chat” creates a fresh session
-   - Health shows model + prompt hash from proxy headers
-*/
-
-//// ---- Config ----
+// ===== Config =====
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
+// Must match your Wrangler secret FRONTEND_APP_KEY
+const APP_KEY    = "abc123";
 
-// Must match your Worker secret FRONTEND_APP_KEY
-const APP_KEY = "abc123";
+// ===== DOM =====
+const feedEl    = document.getElementById("feed");
+const inputEl   = document.getElementById("composerInput");
+const sendBtn   = document.getElementById("sendBtn");
+const newChat   = document.getElementById("newChatBtn");
+const pingBtn   = document.getElementById("pingBtn");
+const healthDot = document.getElementById("healthDot");
+const healthTxt = document.getElementById("healthText");
+const modelTag  = document.getElementById("modelTag");
+const threadsEl = document.getElementById("threads");
 
-// Session: one per browser tab unless you press “New Chat”
-let SESSION_ID = localStorage.getItem("cm.sessionId") || `cm-${Date.now()}`;
-localStorage.setItem("cm.sessionId", SESSION_ID);
+// Simple in-page “thread” memory (optional)
+let threadId = crypto.randomUUID();
+let history = [];
 
-//// ---- DOM ----
-const el = {
-  feed: document.getElementById("feed"),
-  input: document.getElementById("composer-input"),
-  send: document.getElementById("send-btn"),
-  threads: document.getElementById("threads"),
-  newChat: document.getElementById("new-chat"),
-  clearHistory: document.getElementById("clear-history"),
-  healthDot: document.getElementById("health-dot"),
-  healthText: document.getElementById("health-text"),
-};
-
-//// ---- Utilities ----
-function bubble(role, text, opts = {}) {
-  const div = document.createElement("div");
-  div.className = `msg ${role}${opts.error ? " error" : ""}`;
-  div.textContent = text;
-  el.feed.appendChild(div);
-  el.feed.scrollTop = el.feed.scrollHeight;
-  return div;
+function addThreadCard(title) {
+  const d = document.createElement("div");
+  d.className = "thread";
+  d.textContent = title;
+  threadsEl.prepend(d);
 }
 
-function setHealth(status, text) {
-  el.healthText.textContent = text;
-  el.healthDot.classList.remove("dot-ok", "dot-bad", "dot-muted");
-  el.healthDot.classList.add(
-    status === "ok" ? "dot-ok" : status === "bad" ? "dot-bad" : "dot-muted"
-  );
+// ===== UI helpers =====
+function bubble(role, text, kind="") {
+  const d = document.createElement("div");
+  d.className = `msg ${role}${kind ? " " + kind : ""}`;
+  d.textContent = text;
+  feedEl.appendChild(d);
+  feedEl.scrollTop = feedEl.scrollHeight;
+  return d;
+}
+function setHealth(status, msg, model) {
+  healthDot.classList.remove("dot-ok", "dot-bad", "dot-muted");
+  if (status === "ok") healthDot.classList.add("dot-ok");
+  else if (status === "bad") healthDot.classList.add("dot-bad");
+  else healthDot.classList.add("dot-muted");
+  healthTxt.textContent = msg;
+  modelTag.textContent = model ? `· ${model}` : "";
+}
+function disableComposer(disabled) {
+  sendBtn.disabled = disabled;
+  inputEl.disabled = disabled;
 }
 
-function saveThreadPreview(latestUserText = "") {
+// ===== Network =====
+async function pingHealth() {
   try {
-    const list = JSON.parse(localStorage.getItem("cm.threads") || "[]");
-    const idx = list.findIndex((t) => t.id === SESSION_ID);
-    const preview = latestUserText || list[idx]?.preview || "New conversation";
-    const entry = { id: SESSION_ID, ts: Date.now(), preview };
-    if (idx >= 0) list[idx] = entry; else list.unshift(entry);
-    localStorage.setItem("cm.threads", JSON.stringify(list.slice(0, 30)));
-    renderThreads();
-  } catch {}
-}
-
-function renderThreads() {
-  const list = JSON.parse(localStorage.getItem("cm.threads") || "[]");
-  el.threads.innerHTML = "";
-  list.forEach(({ id, preview }) => {
-    const item = document.createElement("button");
-    item.className = "thread";
-    item.textContent = preview || id;
-    item.onclick = () => {
-      SESSION_ID = id;
-      localStorage.setItem("cm.sessionId", SESSION_ID);
-      // soft reset the UI for now (no persistence of feed bubbles)
-      el.feed.innerHTML = "";
-      bubble("assistant", "Picked thread: " + (preview || id));
-    };
-    el.threads.appendChild(item);
-  });
-}
-
-function headers() {
-  return {
-    "content-type": "application/json",
-    "x-app-key": APP_KEY,
-  };
-}
-
-//// ---- Health check (on load & every 60s) ----
-async function checkHealth() {
-  setHealth("muted", "Checking…");
-  try {
-    const res = await fetch(HEALTH_URL, { headers: headers() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    // Read exposed headers to confirm the proxy is applying your config
-    const hModel = res.headers.get("X-CogMyra-Model");
-    const hPrompt = res.headers.get("X-CogMyra-Prompt-Hash");
-    const extras = [];
-    if (hModel) extras.push(hModel);
-    if (hPrompt) extras.push(hPrompt.slice(0, 8) + "…");
-    setHealth("ok", extras.length ? `Healthy • ${extras.join(" • ")}` : "Healthy");
-    return data;
-  } catch (err) {
-    console.error("[health] fail:", err);
-    setHealth("bad", "Health check failed");
+    const r = await fetch(HEALTH_URL, {
+      headers: { "x-app-key": APP_KEY }
+    });
+    const modelHeader = r.headers.get("X-CogMyra-Model") || "";
+    const json = await r.json().catch(() => ({}));
+    const model = json.model || modelHeader || "";
+    if (r.ok) setHealth("ok", "Healthy", model);
+    else setHealth("bad", `Health ${r.status}`, model);
+  } catch (e) {
+    setHealth("bad", "Health error", "");
+    console.error("[health] error:", e);
   }
 }
 
-//// ---- Send message ----
-async function sendMessage() {
-  const text = el.input.value.trim();
+async function postChat(userText) {
+  const body = {
+    // Your Worker injects SYSTEM_PROMPT + MODEL; messages can be simple.
+    messages: [{ role: "user", content: userText }],
+  };
+
+  const r = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-app-key": APP_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const modelHeader = r.headers.get("X-CogMyra-Model") || "";
+  let data;
+  try {
+    data = await r.json();
+  } catch {
+    throw new Error(`Bad JSON from proxy (status ${r.status})`);
+  }
+
+  // Try to surface model + prompt hash in console for verification
+  if (modelHeader) console.log("[proxy] model:", modelHeader);
+  if (data.promptHash) console.log("[proxy] prompt hash:", data.promptHash);
+
+  if (!r.ok) {
+    const raw = typeof data === "object" ? JSON.stringify(data) : String(data);
+    throw new Error(`Proxy error ${r.status}: ${raw}`);
+  }
+
+  const msg = data?.choices?.[0]?.message?.content ?? "";
+  if (!msg) throw new Error("No assistant content in response");
+  return { text: msg, model: data.model || modelHeader || "" };
+}
+
+// ===== Handlers =====
+async function handleSend() {
+  const text = inputEl.value.trim();
   if (!text) return;
 
-  // UI: add user bubble
-  bubble("user", text);
-  saveThreadPreview(text);
-  el.input.value = "";
-  el.input.focus();
-  el.send.disabled = true;
+  // Start a new “thread title” on first message
+  if (history.length === 0) addThreadCard(text.slice(0, 40));
 
+  inputEl.value = "";
+  disableComposer(true);
+  const userB = bubble("user", text);
+  history.push({ role: "user", content: text });
+
+  let assistantB;
   try {
-    const body = {
-      sessionId: SESSION_ID,
-      messages: [{ role: "user", content: text }],
-      // You can pass a model here to override, but proxy already enforces one.
-      // model: "gpt-4o-mini-2024-07-18"
-    };
-
-    const res = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify(body),
-    });
-
-    // Auth / errors
-    if (res.status === 401) {
-      bubble("assistant", "Unauthorized — check your APP_KEY vs FRONTEND_APP_KEY.", { error: true });
-      return;
-    }
-    if (!res.ok) {
-      const raw = await res.text().catch(() => "");
-      bubble("assistant", `Error ${res.status}: ${raw || "Request failed"}`, { error: true });
-      return;
-    }
-
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content || "(no content)";
-    bubble("assistant", content);
-  } catch (err) {
-    console.error("[chat] error:", err);
-    bubble("assistant", "Network error. See console for details.", { error: true });
+    const { text: reply, model } = await postChat(text);
+    assistantB = bubble("assistant", reply);
+    history.push({ role: "assistant", content: reply });
+    // keep health line fresh w/ model
+    if (model) modelTag.textContent = `· ${model}`;
+  } catch (e) {
+    console.error("[chat] error:", e);
+    assistantB = bubble("assistant", "Sorry—request failed. Check console/logs.", "error");
   } finally {
-    el.send.disabled = false;
+    disableComposer(false);
+    inputEl.focus();
   }
 }
 
-//// ---- Events ----
-el.send.addEventListener("click", sendMessage);
-el.input.addEventListener("keydown", (e) => {
+function handleEnterToSend(e) {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    sendMessage();
+    sendBtn.click();
   }
-});
+}
 
-el.newChat?.addEventListener("click", () => {
-  SESSION_ID = `cm-${Date.now()}`;
-  localStorage.setItem("cm.sessionId", SESSION_ID);
-  el.feed.innerHTML = "";
-  bubble("assistant", "New chat started.");
-  saveThreadPreview("");
-});
+function handleNewChat() {
+  // reset in-page state
+  history = [];
+  threadId = crypto.randomUUID();
+  feedEl.innerHTML = "";
+  bubble("assistant", "New chat started. How can I help?");
+  inputEl.focus();
+}
 
-el.clearHistory?.addEventListener("click", () => {
-  localStorage.removeItem("cm.threads");
-  renderThreads();
-  bubble("assistant", "History cleared.");
-});
+// ===== Wire up =====
+sendBtn.addEventListener("click", handleSend);
+inputEl.addEventListener("keydown", handleEnterToSend);
+newChat.addEventListener("click", handleNewChat);
+pingBtn.addEventListener("click", pingHealth);
 
-//// ---- Boot ----
-renderThreads();
-checkHealth();
-setInterval(checkHealth, 60_000);
+// Initial
+pingHealth();
+inputEl.focus();
