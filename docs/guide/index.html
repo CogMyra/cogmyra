@@ -1,71 +1,50 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <title>CogMyra Guide — Your AI Learning Coach</title>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <header class="topbar">
-      <div class="brand">
-        <div class="avatar">CM</div>
-        <div>
-          <div class="title">CogMyra Guide</div>
-          <div class="subtitle">Your AI Learning Coach</div>
+<head>
+  <meta charset="utf-8">
+  <title>CogMyra Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Link to your custom stylesheet -->
+  <link rel="stylesheet" href="/guide/styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <div class="avatar">CM</div>
+      <div>
+        <div class="title">CogMyra</div>
+        <div class="subtitle">Guide</div>
+      </div>
+    </div>
+    <button class="primary">New Chat</button>
+  </div>
+
+  <div class="shell">
+    <!-- History rail -->
+    <aside class="history">
+      <div class="section-title">History</div>
+      <div class="threads">
+        <div class="thread">Example Thread 1</div>
+        <div class="thread">Example Thread 2</div>
+      </div>
+      <div class="rail-footer">
+        <div class="health-line">
+          <span class="dot dot-ok"></span> Healthy
         </div>
       </div>
-      <button id="health-btn" class="ghost">Check</button>
-    </header>
+    </aside>
 
-    <main class="shell">
-      <!-- Left: History rail -->
-      <aside class="history">
-        <div class="section-title">History</div>
-        <div id="threads" class="threads">
-          <!-- Example entries; your JS can populate -->
-          <button class="thread">New Chat</button>
-          <button class="thread">New Chat</button>
-          <button class="thread">New Chat</button>
-          <button class="thread">Chat</button>
-        </div>
-
-        <div class="rail-footer">
-          <button id="new-chat" class="primary block">+ New Chat</button>
-          <div class="health-line">
-            <span id="health-state" class="dot dot-muted"></span>
-            <span id="health-text">Not checked</span>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Right: Chat panel -->
-      <section class="chat">
-        <div id="feed" class="feed">
-          <!-- JS will append .msg elements here -->
-        </div>
-
-        <!-- Composer -->
-        <form id="prompt-form" class="composer">
-          <input
-            id="prompt-input"
-            type="text"
-            placeholder="Type your question..."
-            autocomplete="off"
-          />
-          <button class="primary" type="submit">Send</button>
-        </form>
-      </section>
+    <!-- Chat panel -->
+    <main class="chat">
+      <div class="feed">
+        <div class="msg assistant">Hello, I’m CogMyra.</div>
+        <div class="msg user">Hi!</div>
+      </div>
+      <div class="composer">
+        <input type="text" placeholder="Type a message…" />
+        <button class="primary">Send</button>
+      </div>
     </main>
-
-    <script src="./app.js" type="module"></script>
-  </body>
+  </div>
+</body>
 </html>
