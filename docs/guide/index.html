@@ -1,12 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>CogMyra Guide</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <!-- Styles -->
-  <link rel="stylesheet" href="/guide/styles.css?v=4">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- cache-bust (bump this number any time you don't see changes) -->
+  <link rel="stylesheet" href="/guide/styles.css?v=6" />
 </head>
 <body>
   <div class="topbar">
@@ -17,33 +16,34 @@
         <div class="subtitle">Guide</div>
       </div>
     </div>
-    <button class="primary">New Chat</button>
+    <div class="topbar-right">
+      <span id="health-dot" class="dot dot-muted"></span>
+      <span id="health-text" class="muted">Checking…</span>
+      <button id="new-chat" class="primary">New Chat</button>
+    </div>
   </div>
 
   <div class="shell">
-    <!-- Left rail -->
+    <!-- History rail -->
     <aside class="history">
       <div class="section-title">History</div>
-      <div class="threads"></div>
+      <div id="threads" class="threads"></div>
       <div class="rail-footer">
-        <div class="health-line">
-          <span class="dot dot-ok"></span> Healthy
-        </div>
-        <button class="ghost">Ping health</button>
+        <button id="ping" class="ghost">Ping health</button>
       </div>
     </aside>
 
     <!-- Chat panel -->
     <main class="chat">
-      <div class="feed"></div>
-      <div class="composer">
-        <input placeholder="Type a message…" />
-        <button class="primary">Send</button>
-      </div>
+      <div id="feed" class="feed"></div>
+
+      <form id="composer" class="composer">
+        <input id="input" type="text" placeholder="Type a message…" autocomplete="off" />
+        <button id="send" class="primary" type="submit">Send</button>
+      </form>
     </main>
   </div>
 
-  <!-- App logic -->
-  <script type="module" src="/guide/app.js?v=4"></script>
+  <script type="module" src="/guide/app.js?v=6"></script>
 </body>
 </html>
