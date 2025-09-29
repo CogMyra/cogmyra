@@ -1,107 +1,226 @@
-// ~/cogmyra-dev/docs/guide/app.js
+/* CogMyra Guide — frontend (GPT-5 safe)
+   - Uses your Cloudflare proxy (/api/chat, /api/health)
+   - NO temperature sent (GPT-5 rejects non-default values)
+   - Typewriter output, simple history, “Checking…” health badge
+*/
 
-/* ---------- Elements ---------- */
-const form = document.querySelector("#chat-form");
-const input = document.querySelector("#chat-input");
-const feed = document.querySelector("#chat-feed");
-const historyList = document.querySelector("#thread-history");
+const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
+const CHAT_URL   = `${API_BASE}/api/chat`;
+const HEALTH_URL = `${API_BASE}/api/health`;
+// Must match your Wrangler FRONTEND_APP_KEY
+const APP_KEY    = "abc123";
+
+/* ---------- DOM ---------- */
+const feedEl     = document.querySelector(".feed");
+const inputEl    = document.querySelector(".composer input");
+const sendBtn    = document.querySelector(".composer button.primary");
+const threadsEl  = document.querySelector(".threads");
+const newChatBtn = document.querySelector(".topbar .primary");
+const healthDot  = document.querySelector(".dot");
+const healthLbl  = document.querySelector(".health-line");
+const topbar     = document.querySelector(".topbar");
 
 /* ---------- State ---------- */
-let thread = [];
-let threads = JSON.parse(localStorage.getItem("threads") || "[]");
+let threadId = null;
+const LS_THREADS = "cm_threads_v1";
 
 /* ---------- Helpers ---------- */
-function saveThread() {
-  if (thread.length > 0) {
-    threads.push([...thread]);
-    localStorage.setItem("threads", JSON.stringify(threads));
-    renderHistory();
+function nowId() {
+  return "t-" + Date.now().toString(36);
+}
+function saveThread(id, messages) {
+  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
+  all[id] = { id, ts: Date.now(), messages };
+  localStorage.setItem(LS_THREADS, JSON.stringify(all));
+  renderThreads();
+}
+function loadThread(id) {
+  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
+  return all[id] || null;
+}
+function listThreads() {
+  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
+  return Object.values(all).sort((a,b)=>b.ts-a.ts);
+}
+function truncate(text, n=80){ return text.length>n? text.slice(0,n)+"…": text; }
+
+/* ---------- UI builders ---------- */
+function bubble(role, text, extraClass="") {
+  const div = document.createElement("div");
+  div.className = `msg ${role} ${extraClass}`.trim();
+  div.textContent = text;
+  return div;
+}
+function addBubble(role, text) {
+  const el = bubble(role, text);
+  feedEl.appendChild(el);
+  feedEl.scrollTop = feedEl.scrollHeight;
+  return el;
+}
+async function typewriter(el, text, delay=18) {
+  el.textContent = "";
+  for (const ch of text) {
+    el.textContent += ch;
+    // Keep view scrolled while typing
+    feedEl.scrollTop = feedEl.scrollHeight;
+    await new Promise(r => setTimeout(r, delay));
   }
 }
 
-function renderHistory() {
-  historyList.innerHTML = "";
-  threads.forEach((t, i) => {
+/* ---------- Health badge ---------- */
+async function checkHealth() {
+  // Show temporary “Checking…”
+  if (topbar && !topbar.dataset.healthOnce) {
+    const s = document.createElement("span");
+    s.style.marginLeft = "8px";
+    s.style.fontSize = "12px";
+    s.style.opacity = "0.85";
+    s.textContent = " • Checking…";
+    topbar.appendChild(s);
+  }
+  try {
+    const res = await fetch(HEALTH_URL, {
+      headers: { "x-app-key": APP_KEY }
+    });
+    const data = await res.json();
+    if (healthDot) healthDot.className = "dot dot-ok";
+    if (healthLbl) healthLbl.title = `Model: ${data.model || "unknown"}`;
+    if (topbar && !topbar.dataset.healthOnce) {
+      const ok = document.createElement("span");
+      ok.style.marginLeft = "8px";
+      ok.style.fontSize = "12px";
+      ok.style.opacity = "0.85";
+      ok.textContent = ` • ${data.model || "model"}`;
+      topbar.appendChild(ok);
+      topbar.dataset.healthOnce = "1";
+    }
+  } catch (e) {
+    if (healthDot) healthDot.className = "dot dot-bad";
+    if (topbar && !topbar.dataset.healthOnce) {
+      const bad = document.createElement("span");
+      bad.style.marginLeft = "8px";
+      bad.style.fontSize = "12px";
+      bad.style.opacity = "0.85";
+      bad.textContent = " • Proxy error";
+      topbar.appendChild(bad);
+      topbar.dataset.healthOnce = "1";
+    }
+  }
+}
+
+/* ---------- Threads rail ---------- */
+function renderThreads() {
+  if (!threadsEl) return;
+  threadsEl.innerHTML = "";
+  for (const t of listThreads()) {
+    const firstUser = (t.messages || []).find(m => m.role === "user");
     const btn = document.createElement("button");
-    btn.textContent = `Thread ${i + 1}`;
-    btn.onclick = () => loadThread(i);
-    historyList.appendChild(btn);
+    btn.className = "thread";
+    btn.textContent = truncate(firstUser?.content || "New chat");
+    btn.onclick = () => {
+      threadId = t.id;
+      drawThread(t.messages || []);
+    };
+    threadsEl.appendChild(btn);
+  }
+}
+function drawThread(messages) {
+  feedEl.innerHTML = "";
+  for (const m of messages) {
+    feedEl.appendChild(bubble(m.role, m.content));
+  }
+  feedEl.scrollTop = feedEl.scrollHeight;
+}
+
+/* ---------- Message gathering ---------- */
+function currentMessages() {
+  const nodes = [...feedEl.querySelectorAll(".msg")];
+  return nodes.map(n => {
+    const role = n.classList.contains("user") ? "user" : "assistant";
+    return { role, content: n.textContent || "" };
   });
 }
 
-function loadThread(i) {
-  thread = threads[i] || [];
-  feed.innerHTML = "";
-  thread.forEach(msg => renderMessage(msg.role, msg.content, false));
-}
+/* ---------- Chat send (NO temperature) ---------- */
+async function sendMessage() {
+  const text = (inputEl.value || "").trim();
+  if (!text) return;
 
-function renderMessage(role, content, append = true) {
-  const div = document.createElement("div");
-  div.className = `msg ${role}`;
-  div.textContent = content;
-  feed.appendChild(div);
-  feed.scrollTop = feed.scrollHeight;
-  if (append) thread.push({ role, content });
-}
+  // Ensure a thread
+  if (!threadId) threadId = nowId();
 
-/* ---------- Typewriter Effect ---------- */
-async function typewriterEffect(role, text) {
-  const div = document.createElement("div");
-  div.className = `msg ${role}`;
-  feed.appendChild(div);
-  feed.scrollTop = feed.scrollHeight;
+  // User bubble
+  const userEl = addBubble("user", text);
 
-  for (let i = 0; i < text.length; i++) {
-    div.textContent += text[i];
-    feed.scrollTop = feed.scrollHeight;
-    await new Promise(r => setTimeout(r, 15)); // typing speed
-  }
-  thread.push({ role, content: text });
-}
+  // Placeholder assistant bubble (we'll type into it)
+  const botEl = addBubble("assistant", "…");
 
-/* ---------- Chat Request ---------- */
-async function sendMessage(userInput) {
-  renderMessage("user", userInput);
+  // Clear composer
+  inputEl.value = "";
+  inputEl.focus();
 
   try {
-    const resp = await fetch("https://cogmyra-proxy.cogmyra.workers.dev/api/chat", {
+    const messages = [...currentMessages(), { role: "user", content: text }];
+
+    const res = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-app-key": "abc123"
+        "x-app-key": APP_KEY,
       },
-      body: JSON.stringify({
-        messages: [...thread, { role: "user", content: userInput }]
-      })
+      // IMPORTANT: no temperature for GPT-5
+      body: JSON.stringify({ messages })
     });
 
-    const data = await resp.json();
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content || "(no content)";
+    await typewriter(botEl, content, 16);
 
-    if (data.error) {
-      renderMessage("assistant", `⚠️ Error: ${data.error.message || "Unknown"}`);
-      console.error("Proxy error:", data);
-      return;
-    }
-
-    const reply = data.choices?.[0]?.message?.content || "[No reply]";
-    await typewriterEffect("assistant", reply);
-
+    // Persist
+    saveThread(threadId, currentMessages());
   } catch (err) {
-    console.error(err);
-    renderMessage("assistant", "⚠️ Network error.");
+    botEl.classList.add("error");
+    botEl.textContent = "Error talking to CogMyra proxy.";
   }
 }
 
-/* ---------- Form Submit ---------- */
-form.addEventListener("submit", async e => {
-  e.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
+/* ---------- Wire events ---------- */
+function wireUI() {
+  // Enter to send
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener("click", sendMessage);
 
-  await sendMessage(text);
-  saveThread();
-});
+  // New chat
+  if (newChatBtn) {
+    newChatBtn.onclick = () => {
+      threadId = nowId();
+      feedEl.innerHTML = "";
+      const hello = addBubble("assistant", "Hello, I’m CogMyra.");
+      typewriter(hello, "Hello, I’m CogMyra.", 10); // quick intro
+      saveThread(threadId, currentMessages());
+    };
+  }
 
-/* ---------- Init ---------- */
-renderHistory();
+  // Load latest or start fresh
+  const latest = listThreads()[0];
+  if (latest) {
+    threadId = latest.id;
+    drawThread(latest.messages || []);
+  } else {
+    threadId = nowId();
+    const hello = addBubble("assistant", "Hello, I’m CogMyra.");
+    typewriter(hello, "Hello, I’m CogMyra.", 10);
+    saveThread(threadId, currentMessages());
+  }
+
+  renderThreads();
+  checkHealth();
+}
+
+/* ---------- Boot ---------- */
+document.addEventListener("DOMContentLoaded", wireUI);
