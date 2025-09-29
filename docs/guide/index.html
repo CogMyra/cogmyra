@@ -1,49 +1,49 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>CogMyra Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Link to custom stylesheet -->
-  <link rel="stylesheet" href="/guide/styles.css?v=3">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/guide/styles.css?v=4">
 </head>
 <body>
-  <div class="topbar"> 
+  <div class="topbar">
     <div class="brand">
       <div class="avatar">CM</div>
       <div>
-        <div class="title">CogMyra</div> 
+        <div class="title">CogMyra</div>
         <div class="subtitle">Guide</div>
       </div>
     </div>
-    <button class="primary" id="new-chat">New Chat</button>
+    <button class="primary">New Chat</button>
   </div>
-  
+
   <div class="shell">
-    <!-- History rail -->  
+    <!-- Left rail -->
     <aside class="history">
       <div class="section-title">History</div>
-      <div class="threads" id="threads"></div>
-      <div class="rail-footer">  
+      <div class="threads"></div>
+      <div class="rail-footer">
         <div class="health-line">
           <span class="dot dot-ok"></span> Healthy
         </div>
+        <button class="ghost">Ping health</button>
       </div>
     </aside>
-    
+
     <!-- Chat panel -->
-    <main class="chat"> 
-      <div class="feed" id="feed">
-        <div class="msg assistant">Hello, I’m CogMyra.</div>
-      </div>
+    <main class="chat">
+      <div class="feed"></div>
       <div class="composer">
-        <input type="text" id="composer-input" placeholder="Type a message…" />
-        <button class="primary" id="send-btn">Send</button>
+        <input placeholder="Type a message…" />
+        <button class="primary">Send</button>
       </div>
     </main>
   </div>
 
-  <!-- Load app.js -->
-  <script src="/guide/app.js?v=3"></script>
+  <!-- App logic -->
+  <script type="module" src="/guide/app.js?v=4"></script>
 </body>
 </html>
