@@ -1,162 +1,107 @@
-// ---------- Config ----------
-const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
-const CHAT_URL   = `${API_BASE}/api/chat`;
-const HEALTH_URL = `${API_BASE}/api/health`;
-// must match your Wrangler secret FRONTEND_APP_KEY
-const APP_KEY    = "abc123";
+// ~/cogmyra-dev/docs/guide/app.js
 
-// ---------- State ----------
-let threads = JSON.parse(localStorage.getItem("cm_threads") || "[]");
-let activeThreadId = localStorage.getItem("cm_active") || null;
+/* ---------- Elements ---------- */
+const form = document.querySelector("#chat-form");
+const input = document.querySelector("#chat-input");
+const feed = document.querySelector("#chat-feed");
+const historyList = document.querySelector("#thread-history");
 
-// ---------- DOM ----------
-const feed   = document.querySelector("#feed");
-const input  = document.querySelector("#input");
-const form   = document.querySelector("#composer");
-const ping   = document.querySelector("#ping");
-const healthDot  = document.querySelector("#health-dot");
-const healthText = document.querySelector("#health-text");
-const newChatBtn = document.querySelector("#new-chat");
-const threadsEl  = document.querySelector("#threads");
+/* ---------- State ---------- */
+let thread = [];
+let threads = JSON.parse(localStorage.getItem("threads") || "[]");
 
-// ---------- Utilities ----------
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-function saveThreads() {
-  localStorage.setItem("cm_threads", JSON.stringify(threads));
-  localStorage.setItem("cm_active", activeThreadId || "");
-}
-
-function getActiveThread() {
-  let t = threads.find(t => t.id === activeThreadId);
-  if (!t) {
-    t = { id: crypto.randomUUID(), title: "New chat", msgs: [] };
-    threads.unshift(t);
-    activeThreadId = t.id;
-    saveThreads();
+/* ---------- Helpers ---------- */
+function saveThread() {
+  if (thread.length > 0) {
+    threads.push([...thread]);
+    localStorage.setItem("threads", JSON.stringify(threads));
+    renderHistory();
   }
-  return t;
 }
 
-function renderThreads() {
-  threadsEl.innerHTML = "";
-  threads.forEach(t => {
+function renderHistory() {
+  historyList.innerHTML = "";
+  threads.forEach((t, i) => {
     const btn = document.createElement("button");
-    btn.className = "thread";
-    btn.textContent = t.title || "Chat";
-    btn.onclick = () => {
-      activeThreadId = t.id; saveThreads(); renderFeed();
-    };
-    threadsEl.appendChild(btn);
+    btn.textContent = `Thread ${i + 1}`;
+    btn.onclick = () => loadThread(i);
+    historyList.appendChild(btn);
   });
 }
 
-function renderFeed() {
-  const t = getActiveThread();
+function loadThread(i) {
+  thread = threads[i] || [];
   feed.innerHTML = "";
-  t.msgs.forEach(m => addMsgToFeed(m.role, m.content));
-  feed.scrollTop = feed.scrollHeight;
+  thread.forEach(msg => renderMessage(msg.role, msg.content, false));
 }
 
-function addMsgToFeed(role, text) {
+function renderMessage(role, content, append = true) {
   const div = document.createElement("div");
   div.className = `msg ${role}`;
-  div.textContent = text;
+  div.textContent = content;
   feed.appendChild(div);
-  return div;
+  feed.scrollTop = feed.scrollHeight;
+  if (append) thread.push({ role, content });
 }
 
-async function typewriter(el, fullText, speed = 12) {
-  el.textContent = "";
-  for (let i = 0; i < fullText.length; i++) {
-    el.textContent += fullText[i];
-    // slightly faster for whitespace for nicer feel
-    await sleep(fullText[i].trim() ? speed : Math.max(1, speed/2));
+/* ---------- Typewriter Effect ---------- */
+async function typewriterEffect(role, text) {
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+
+  for (let i = 0; i < text.length; i++) {
+    div.textContent += text[i];
     feed.scrollTop = feed.scrollHeight;
+    await new Promise(r => setTimeout(r, 15)); // typing speed
   }
+  thread.push({ role, content: text });
 }
 
-// ---------- Network ----------
-async function pingHealth() {
-  try {
-    const res = await fetch(HEALTH_URL, { headers: { "x-app-key": APP_KEY } });
-    const data = await res.json();
-    healthDot.className = "dot dot-ok";
-    healthText.textContent = "Healthy";
-    // optional: show model/prompt hash in tooltip
-    const model = res.headers.get("X-CogMyra-Model");
-    const hash  = res.headers.get("X-CogMyra-Prompt-Hash");
-    if (model || hash) healthText.title = `Model: ${model}\nPrompt: ${hash}`;
-  } catch (e) {
-    healthDot.className = "dot dot-bad";
-    healthText.textContent = "Error";
-  }
-}
-
-async function sendToLLM(messages) {
-  const res = await fetch(CHAT_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-app-key": APP_KEY
-    },
-    body: JSON.stringify({ messages })
-  });
-  if (!res.ok) throw new Error(`chat ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "(no content)";
-}
-
-// ---------- Actions ----------
-newChatBtn.onclick = () => {
-  activeThreadId = null;
-  renderFeed(); renderThreads();
-};
-
-ping.onclick = () => pingHealth();
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = (input.value || "").trim();
-  if (!text) return;
-
-  const thread = getActiveThread();
-  // user bubble
-  addMsgToFeed("user", text);
-  thread.msgs.push({ role: "user", content: text });
-  input.value = "";
-  saveThreads();
+/* ---------- Chat Request ---------- */
+async function sendMessage(userInput) {
+  renderMessage("user", userInput);
 
   try {
-    // call proxy
-    const answer = await sendToLLM(thread.msgs);
-    // assistant bubble (typewriter)
-    const bubble = addMsgToFeed("assistant", "");
-    await typewriter(bubble, answer, 12);
+    const resp = await fetch("https://cogmyra-proxy.cogmyra.workers.dev/api/chat", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-app-key": "abc123"
+      },
+      body: JSON.stringify({
+        messages: [...thread, { role: "user", content: userInput }]
+      })
+    });
 
-    // store
-    thread.msgs.push({ role: "assistant", content: answer });
-    // first AI message becomes thread title (simple)
-    if (!thread.title || thread.title === "New chat") thread.title = text.slice(0, 32);
-    saveThreads(); renderThreads();
+    const data = await resp.json();
+
+    if (data.error) {
+      renderMessage("assistant", `⚠️ Error: ${data.error.message || "Unknown"}`);
+      console.error("Proxy error:", data);
+      return;
+    }
+
+    const reply = data.choices?.[0]?.message?.content || "[No reply]";
+    await typewriterEffect("assistant", reply);
+
   } catch (err) {
-    const b = addMsgToFeed("assistant", "Sorry, something went wrong.");
-    b.classList.add("error");
+    console.error(err);
+    renderMessage("assistant", "⚠️ Network error.");
   }
+}
+
+/* ---------- Form Submit ---------- */
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+
+  await sendMessage(text);
+  saveThread();
 });
 
-// ---------- Boot ----------
-renderThreads();
-renderFeed();
-pingHealth();
-
-// greeting if empty
-(() => {
-  const t = getActiveThread();
-  if (t.msgs.length === 0) {
-    const hello = "Hello, I’m CogMyra.";
-    addMsgToFeed("assistant", hello);
-    t.msgs.push({ role: "assistant", content: hello });
-    saveThreads();
-  }
-})();
+/* ---------- Init ---------- */
+renderHistory();
