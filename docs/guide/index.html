@@ -1,88 +1,71 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CogMyra Guide – Your AI Learning Coach</title>
-
-  <!-- SEO -->
-  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback." />
-  <meta property="og:title" content="CogMyra Guide – Your AI Learning Coach" />
-  <meta property="og:description" content="Instant explanations, practice, and feedback tailored to you." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://cogmyra.com/guide/" />
-  <meta property="og:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
-  <meta property="og:image:width" content="1200"/>
-  <meta property="og:image:height" content="630"/>
-  <meta property="og:image:alt" content="CogMyra – Your AI Learning Coach"/>
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
-
-  <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#24324d; }
-    * { box-sizing: border-box; }
-    html, body { height:100%; margin:0; }
-    body { background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-
-    header { display:flex; align-items:center; gap:10px; padding:20px 24px; border-bottom:1px solid var(--border); }
-    header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); display:grid; place-items:center; font-weight:bold; color:#071122; }
-    header .brand .name { font-weight:700; }
-    header .brand .sub { color:var(--muted); font-size:12px; }
-
-    .container { display:grid; grid-template-columns: 280px 1fr; gap:16px; height:calc(100% - 62px); padding:16px; }
-    .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; }
-    .history { height:100%; display:flex; flex-direction:column; }
-    .history .scroll { flex:1; overflow:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
-    .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--fg); padding:8px 10px; border-radius:8px; cursor:pointer; }
-    .btn.primary { background:var(--acc); color:#071122; border-color:transparent; font-weight:600; }
-    .btn.block { width:100%; }
-
-    .chat { height:100%; display:flex; flex-direction:column; }
-    .chat .scroll { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
-    .bubble { padding:12px 14px; border-radius:12px; max-width:70%; }
-    .bubble.user { background:var(--acc); color:#071122; align-self:flex-end; }
-    .bubble.ai { background:var(--panel2); border:1px solid var(--border); align-self:flex-start; }
-    .chat form { display:flex; gap:8px; padding:16px; border-top:1px solid var(--border); }
-    .chat input { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--fg); }
-
-    /* health check section */
-    .health-check { margin:12px; display:flex; gap:8px; align-items:center; }
-    #health { font-size:13px; color:var(--muted); }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="logo">CM</div>
-    <div class="brand">
-      <div class="name">CogMyra Guide</div>
-      <div class="sub">Your AI Learning Coach</div>
-    </div>
-  </header>
-
-  <div class="container">
-    <!-- Left Panel -->
-    <div class="panel history">
-      <div class="scroll" id="history">
-        <button class="btn block primary" id="newThread">+ New Chat</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>CogMyra Guide — Your AI Learning Coach</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="avatar">CM</div>
+        <div>
+          <div class="title">CogMyra Guide</div>
+          <div class="subtitle">Your AI Learning Coach</div>
+        </div>
       </div>
+      <button id="health-btn" class="ghost">Check</button>
+    </header>
 
-      <!-- Health check area -->
-      <div class="health-check">
-        <button class="btn" id="checkHealth">Check</button>
-        <div id="health">Not checked</div>
-      </div>
-    </div>
+    <main class="shell">
+      <!-- Left: History rail -->
+      <aside class="history">
+        <div class="section-title">History</div>
+        <div id="threads" class="threads">
+          <!-- Example entries; your JS can populate -->
+          <button class="thread">New Chat</button>
+          <button class="thread">New Chat</button>
+          <button class="thread">New Chat</button>
+          <button class="thread">Chat</button>
+        </div>
 
-    <!-- Right Panel -->
-    <div class="panel chat">
-      <div class="scroll" id="messages"></div>
-      <form id="chatForm">
-        <input id="input" placeholder="Type your question..." />
-        <button type="submit" class="btn primary" id="send">Send</button>
-      </form>
-    </div>
-  </div>
+        <div class="rail-footer">
+          <button id="new-chat" class="primary block">+ New Chat</button>
+          <div class="health-line">
+            <span id="health-state" class="dot dot-muted"></span>
+            <span id="health-text">Not checked</span>
+          </div>
+        </div>
+      </aside>
 
-  <script src="app.js"></script>
-</body>
+      <!-- Right: Chat panel -->
+      <section class="chat">
+        <div id="feed" class="feed">
+          <!-- JS will append .msg elements here -->
+        </div>
+
+        <!-- Composer -->
+        <form id="prompt-form" class="composer">
+          <input
+            id="prompt-input"
+            type="text"
+            placeholder="Type your question..."
+            autocomplete="off"
+          />
+          <button class="primary" type="submit">Send</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
 </html>
