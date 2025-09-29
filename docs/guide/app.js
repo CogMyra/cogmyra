@@ -110,30 +110,17 @@ function disableComposer(disabled) {
   inputEl.disabled = disabled;
 }
 
-// ===== Typewriter ("streaming") =====
-const TYPE_SPEED_CHARS_PER_SEC = 60; // adjust for faster/slower typing
-function typeIntoBubble(bubbleEl, fullText, onDone) {
-  // Clear existing and type text progressively
-  bubbleEl.textContent = "";
-  let i = 0;
-  let lastTs = 0;
-  const charsPerMs = TYPE_SPEED_CHARS_PER_SEC / 1000;
-
-  function step(ts) {
-    if (!lastTs) lastTs = ts;
-    const dt = ts - lastTs;
-    lastTs = ts;
-    i += Math.max(1, Math.floor(dt * charsPerMs));
-    const slice = fullText.slice(0, i);
-    bubbleEl.textContent = slice || " ";
+// ===== Typewriter: guaranteed per-char typing (no re-render until done) =====
+const TYPE_DELAY_MS = 16; // ~60 chars/sec. Increase for slower typing.
+async function typeIntoBubbleAwait(bubbleEl, fullText) {
+  bubbleEl.textContent = ""; // start empty
+  for (let i = 0; i < fullText.length; i++) {
+    bubbleEl.textContent += fullText[i];
     feedEl.scrollTop = feedEl.scrollHeight;
-    if (i < fullText.length) {
-      requestAnimationFrame(step);
-    } else {
-      onDone && onDone();
-    }
+    // small delay each char
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise(res => setTimeout(res, TYPE_DELAY_MS));
   }
-  requestAnimationFrame(step);
 }
 
 // ===== Network =====
@@ -198,7 +185,7 @@ async function handleSend() {
 
   // add assistant bubble placeholder (empty) to type into
   const assistantBubble = makeBubble("assistant", " ");
-  // remember the placeholder in state so a refresh still shows it
+  // keep stub in state while typing (so a refresh still shows a pending msg)
   const stub = { role: "assistant", content: "", kind: "pending" };
   t.messages.push(stub);
   saveThreads();
@@ -206,15 +193,15 @@ async function handleSend() {
   try {
     const { text: reply, model } = await postChat(text);
 
-    // animate typing into the on-screen bubble
-    typeIntoBubble(assistantBubble, reply, () => {
-      // when done, replace stub in state with final content
-      const idx = t.messages.indexOf(stub);
-      if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: reply });
-      else t.messages.push({ role: "assistant", content: reply });
-      saveThreads();
-      renderFeed(); // re-render to remove "pending" kind (keeps same text)
-    });
+    // IMPORTANT: Do NOT re-render feed until typing finishes.
+    await typeIntoBubbleAwait(assistantBubble, reply);
+
+    // replace stub with final message and then re-render once
+    const idx = t.messages.indexOf(stub);
+    if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: reply });
+    else t.messages.push({ role: "assistant", content: reply });
+    saveThreads();
+    renderFeed();
 
     if (model) modelTag.textContent = `· ${model}`;
   } catch (e) {
