@@ -2,8 +2,7 @@
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
-// Must match your Wrangler secret FRONTEND_APP_KEY
-const APP_KEY    = "abc123";
+const APP_KEY    = "abc123"; // must match your Worker FRONTEND_APP_KEY
 
 // ===== DOM =====
 const feedEl    = document.getElementById("feed");
@@ -16,18 +15,52 @@ const healthTxt = document.getElementById("healthText");
 const modelTag  = document.getElementById("modelTag");
 const threadsEl = document.getElementById("threads");
 
-// Simple in-page “thread” memory (optional)
-let threadId = crypto.randomUUID();
-let history = [];
+// ===== Local storage model =====
+// threads: { [threadId]: { id, title, createdAt, messages: [{role,content}] } }
+const LS_KEY = "cogmyra_guide_threads_v1";
+let threads = loadThreads();
+let activeId = null;
 
-function addThreadCard(title) {
-  const d = document.createElement("div");
-  d.className = "thread";
-  d.textContent = title;
-  threadsEl.prepend(d);
+// ===== Storage helpers =====
+function loadThreads() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : {};
+  } catch { return {}; }
+}
+function saveThreads() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(threads)); }
+  catch (e) { console.warn("failed to save threads", e); }
+}
+function createThread(title = "New Chat") {
+  const id = crypto.randomUUID();
+  threads[id] = {
+    id,
+    title,
+    createdAt: Date.now(),
+    messages: [{ role: "assistant", content: "New chat started. How can I help?" }]
+  };
+  saveThreads();
+  return id;
+}
+function setActive(id) {
+  activeId = id;
+  renderThreads();
+  renderFeed();
+  inputEl.focus();
+}
+function current() {
+  if (!activeId || !threads[activeId]) {
+    const id = createThread("New Chat");
+    setActive(id);
+  }
+  return threads[activeId];
 }
 
 // ===== UI helpers =====
+function clear(el){ while(el.firstChild) el.removeChild(el.firstChild); }
 function bubble(role, text, kind="") {
   const d = document.createElement("div");
   d.className = `msg ${role}${kind ? " " + kind : ""}`;
@@ -35,6 +68,35 @@ function bubble(role, text, kind="") {
   feedEl.appendChild(d);
   feedEl.scrollTop = feedEl.scrollHeight;
   return d;
+}
+function renderFeed() {
+  clear(feedEl);
+  const t = current();
+  for (const m of t.messages) bubble(m.role, m.content, m.kind || "");
+}
+function renderThreads() {
+  clear(threadsEl);
+  // sort newest first
+  const arr = Object.values(threads).sort((a,b)=>b.createdAt-a.createdAt);
+  for (const t of arr) {
+    const d = document.createElement("div");
+    d.className = "thread";
+    d.textContent = t.title || "Untitled";
+    if (t.id === activeId) d.style.borderColor = "#33507a";
+    d.addEventListener("click", ()=> setActive(t.id));
+    threadsEl.appendChild(d);
+  }
+}
+function updateTitleFromFirstUserMessage(t) {
+  const firstUser = t.messages.find(m=>m.role==="user");
+  if (firstUser) {
+    const newTitle = firstUser.content.slice(0, 40);
+    if (newTitle && newTitle !== t.title) {
+      t.title = newTitle;
+      saveThreads();
+      renderThreads();
+    }
+  }
 }
 function setHealth(status, msg, model) {
   healthDot.classList.remove("dot-ok", "dot-bad", "dot-muted");
@@ -52,9 +114,7 @@ function disableComposer(disabled) {
 // ===== Network =====
 async function pingHealth() {
   try {
-    const r = await fetch(HEALTH_URL, {
-      headers: { "x-app-key": APP_KEY }
-    });
+    const r = await fetch(HEALTH_URL, { headers: { "x-app-key": APP_KEY } });
     const modelHeader = r.headers.get("X-CogMyra-Model") || "";
     const json = await r.json().catch(() => ({}));
     const model = json.model || modelHeader || "";
@@ -67,11 +127,7 @@ async function pingHealth() {
 }
 
 async function postChat(userText) {
-  const body = {
-    // Your Worker injects SYSTEM_PROMPT + MODEL; messages can be simple.
-    messages: [{ role: "user", content: userText }],
-  };
-
+  const body = { messages: [{ role: "user", content: userText }] };
   const r = await fetch(CHAT_URL, {
     method: "POST",
     headers: {
@@ -83,13 +139,9 @@ async function postChat(userText) {
 
   const modelHeader = r.headers.get("X-CogMyra-Model") || "";
   let data;
-  try {
-    data = await r.json();
-  } catch {
-    throw new Error(`Bad JSON from proxy (status ${r.status})`);
-  }
+  try { data = await r.json(); }
+  catch { throw new Error(`Bad JSON from proxy (status ${r.status})`); }
 
-  // Try to surface model + prompt hash in console for verification
   if (modelHeader) console.log("[proxy] model:", modelHeader);
   if (data.promptHash) console.log("[proxy] prompt hash:", data.promptHash);
 
@@ -108,24 +160,39 @@ async function handleSend() {
   const text = inputEl.value.trim();
   if (!text) return;
 
-  // Start a new “thread title” on first message
-  if (history.length === 0) addThreadCard(text.slice(0, 40));
+  const t = current();
 
   inputEl.value = "";
   disableComposer(true);
-  const userB = bubble("user", text);
-  history.push({ role: "user", content: text });
 
-  let assistantB;
+  // push + render user
+  t.messages.push({ role: "user", content: text });
+  saveThreads();
+  renderFeed();
+  updateTitleFromFirstUserMessage(t);
+
+  // typing stub (optional)
+  const stub = { role: "assistant", content: "…" , kind: "pending" };
+  t.messages.push(stub);
+  saveThreads();
+  renderFeed();
+
   try {
     const { text: reply, model } = await postChat(text);
-    assistantB = bubble("assistant", reply);
-    history.push({ role: "assistant", content: reply });
-    // keep health line fresh w/ model
+    // replace stub
+    const idx = t.messages.indexOf(stub);
+    if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: reply });
+    else t.messages.push({ role: "assistant", content: reply });
+    saveThreads();
+    renderFeed();
     if (model) modelTag.textContent = `· ${model}`;
   } catch (e) {
     console.error("[chat] error:", e);
-    assistantB = bubble("assistant", "Sorry—request failed. Check console/logs.", "error");
+    const idx = t.messages.indexOf(stub);
+    if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: "Sorry—request failed. Check console/logs.", kind: "error" });
+    else t.messages.push({ role: "assistant", content: "Sorry—request failed. Check console/logs.", kind: "error" });
+    saveThreads();
+    renderFeed();
   } finally {
     disableComposer(false);
     inputEl.focus();
@@ -140,12 +207,8 @@ function handleEnterToSend(e) {
 }
 
 function handleNewChat() {
-  // reset in-page state
-  history = [];
-  threadId = crypto.randomUUID();
-  feedEl.innerHTML = "";
-  bubble("assistant", "New chat started. How can I help?");
-  inputEl.focus();
+  const id = createThread("New Chat");
+  setActive(id);
 }
 
 // ===== Wire up =====
@@ -154,6 +217,14 @@ inputEl.addEventListener("keydown", handleEnterToSend);
 newChat.addEventListener("click", handleNewChat);
 pingBtn.addEventListener("click", pingHealth);
 
-// Initial
+// ===== Initial paint =====
+if (!Object.keys(threads).length) {
+  const id = createThread("Welcome");
+  setActive(id);
+} else {
+  // keep last-open thread selected (latest by createdAt)
+  const latest = Object.values(threads).sort((a,b)=>b.createdAt-a.createdAt)[0];
+  setActive(latest.id);
+}
 pingHealth();
 inputEl.focus();
