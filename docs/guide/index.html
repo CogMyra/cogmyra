@@ -6,7 +6,7 @@
   <title>CogMyra Guide – Your AI Learning Coach</title>
 
   <!-- SEO -->
-  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback tailored to you." />
+  <meta name="description" content="Try the CogMyra Guide: personalized AI learning coach with explanations, practice, and feedback." />
   <meta property="og:title" content="CogMyra Guide – Your AI Learning Coach" />
   <meta property="og:description" content="Instant explanations, practice, and feedback tailored to you." />
   <meta property="og:type" content="website" />
@@ -19,10 +19,10 @@
   <meta name="twitter:image" content="https://cogmyra.com/og-guide-1200x630.jpg" />
 
   <style>
-    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#2d3a55; }
+    :root { --bg:#0b1220; --fg:#e9eef8; --muted:#b6c2db; --acc:#5aa3ff; --panel:#111a2b; --panel2:#0f1728; --border:#24324d; }
     * { box-sizing: border-box; }
-    html, body { height:100%; }
-    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    html, body { height:100%; margin:0; }
+    body { background:var(--bg); color:var(--fg); font:15px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
 
     header { display:flex; align-items:center; gap:10px; padding:20px 24px; border-bottom:1px solid var(--border); }
     header .logo { width:30px; height:30px; border-radius:8px; background:var(--acc); display:grid; place-items:center; font-weight:bold; color:#071122; }
@@ -32,14 +32,11 @@
     .container { display:grid; grid-template-columns: 280px 1fr; gap:16px; height:calc(100% - 62px); padding:16px; }
     .panel { background:var(--panel); border:1px solid var(--border); border-radius:14px; }
     .history { height:100%; display:flex; flex-direction:column; }
-    .history header { padding:12px; border-bottom:1px solid var(--border); }
-    .history header h3 { font-size:14px; margin:0; }
-    .history .scroll { overflow:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
-    .history .item { background:var(--panel2); border:1px solid var(--border); border-radius:12px; padding:10px; cursor:pointer; }
-    .history .item small { color:var(--muted); display:block; margin-top:6px; }
+    .history .scroll { flex:1; overflow:auto; padding:8px; display:flex; flex-direction:column; gap:8px; }
     .btn { appearance:none; border:1px solid var(--border); background:var(--panel2); color:var(--fg); padding:8px 10px; border-radius:8px; cursor:pointer; }
     .btn.primary { background:var(--acc); color:#071122; border-color:transparent; font-weight:600; }
     .btn.block { width:100%; }
+
     .chat { height:100%; display:flex; flex-direction:column; }
     .chat .scroll { flex:1; overflow:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
     .bubble { padding:12px 14px; border-radius:12px; max-width:70%; }
@@ -47,6 +44,10 @@
     .bubble.ai { background:var(--panel2); border:1px solid var(--border); align-self:flex-start; }
     .chat form { display:flex; gap:8px; padding:16px; border-top:1px solid var(--border); }
     .chat input { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--fg); }
+
+    /* health check section */
+    .health-check { margin:12px; display:flex; gap:8px; align-items:center; }
+    #health { font-size:13px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -59,56 +60,29 @@
   </header>
 
   <div class="container">
+    <!-- Left Panel -->
     <div class="panel history">
-      <header><h3>History</h3></header>
-      <div class="scroll" id="history"></div>
-      <div class="new"><button class="btn primary block" onclick="newChat()">+ New Chat</button></div>
+      <div class="scroll" id="history">
+        <button class="btn block primary" id="newThread">+ New Chat</button>
+      </div>
+
+      <!-- Health check area -->
+      <div class="health-check">
+        <button class="btn" id="checkHealth">Check</button>
+        <div id="health">Not checked</div>
+      </div>
     </div>
+
+    <!-- Right Panel -->
     <div class="panel chat">
-      <div class="scroll" id="chat"></div>
-      <form onsubmit="handleSubmit(event)">
-        <input id="message" placeholder="Type your question..." autocomplete="off" />
-        <button class="btn primary">Send</button>
+      <div class="scroll" id="messages"></div>
+      <form id="chatForm">
+        <input id="input" placeholder="Type your question..." />
+        <button type="submit" class="btn primary" id="send">Send</button>
       </form>
     </div>
   </div>
 
-  <script>
-    const API_BASE = "https://cogmyra-proxy.cogmyra.workers.dev";
-
-    let chatHistory = [];
-
-    function addMessage(role, content) {
-      chatHistory.push({ role, content });
-      const bubble = document.createElement("div");
-      bubble.className = "bubble " + role;
-      bubble.textContent = content;
-      document.getElementById("chat").appendChild(bubble);
-      document.getElementById("chat").scrollTop = chat.scrollHeight;
-    }
-
-    async function handleSubmit(e) {
-      e.preventDefault();
-      const input = document.getElementById("message");
-      const text = input.value.trim();
-      if (!text) return;
-      addMessage("user", text);
-      input.value = "";
-
-      const res = await fetch(`${API_BASE}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: chatHistory }),
-      });
-
-      const data = await res.json();
-      addMessage("ai", data.output || "[No response]");
-    }
-
-    function newChat() {
-      chatHistory = [];
-      document.getElementById("chat").innerHTML = "";
-    }
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
