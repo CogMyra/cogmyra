@@ -1,226 +1,182 @@
-/* CogMyra Guide — frontend (GPT-5 safe)
-   - Uses your Cloudflare proxy (/api/chat, /api/health)
-   - NO temperature sent (GPT-5 rejects non-default values)
-   - Typewriter output, simple history, “Checking…” health badge
-*/
-
+// ---------- Config ----------
 const API_BASE   = "https://cogmyra-proxy.cogmyra.workers.dev";
 const CHAT_URL   = `${API_BASE}/api/chat`;
 const HEALTH_URL = `${API_BASE}/api/health`;
-// Must match your Wrangler FRONTEND_APP_KEY
+// This must equal your Wrangler secret FRONTEND_APP_KEY
 const APP_KEY    = "abc123";
 
-/* ---------- DOM ---------- */
-const feedEl     = document.querySelector(".feed");
-const inputEl    = document.querySelector(".composer input");
-const sendBtn    = document.querySelector(".composer button.primary");
-const threadsEl  = document.querySelector(".threads");
-const newChatBtn = document.querySelector(".topbar .primary");
-const healthDot  = document.querySelector(".dot");
-const healthLbl  = document.querySelector(".health-line");
-const topbar     = document.querySelector(".topbar");
+// ---------- DOM ----------
+const feed        = document.getElementById("feed");
+const input       = document.getElementById("input");
+const sendBtn     = document.getElementById("send");
+const newBtn      = document.getElementById("new-chat");
+const threadsEl   = document.getElementById("threads");
+const pingBtn     = document.getElementById("ping");
+const dotSmall    = document.getElementById("dot");
+const healthLabel = document.getElementById("health-label");
+const topDot      = document.getElementById("health-dot");
+const topText     = document.getElementById("health-text");
+const modelBadge  = document.getElementById("model-badge");
 
-/* ---------- State ---------- */
-let threadId = null;
-const LS_THREADS = "cm_threads_v1";
+// ---------- State ----------
+let sessionId = crypto.randomUUID();
+let threads = JSON.parse(localStorage.getItem("cm_threads") || "[]");
 
-/* ---------- Helpers ---------- */
-function nowId() {
-  return "t-" + Date.now().toString(36);
+// ---------- Helpers ----------
+function el(tag, cls, text="") {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text) e.textContent = text;
+  return e;
 }
-function saveThread(id, messages) {
-  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
-  all[id] = { id, ts: Date.now(), messages };
-  localStorage.setItem(LS_THREADS, JSON.stringify(all));
+function pushThreadPreview(prompt) {
+  const title = prompt.length > 40 ? prompt.slice(0, 40) + "…" : prompt;
+  threads.unshift({ id: sessionId, title, ts: Date.now() });
+  threads = threads.slice(0, 30);
+  localStorage.setItem("cm_threads", JSON.stringify(threads));
   renderThreads();
+}
+function renderThreads() {
+  threadsEl.innerHTML = "";
+  for (const t of threads) {
+    const a = el("button", "thread", t.title);
+    a.onclick = () => loadThread(t.id);
+    threadsEl.appendChild(a);
+  }
 }
 function loadThread(id) {
-  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
-  return all[id] || null;
+  sessionId = id;
+  const saved = JSON.parse(localStorage.getItem("cm_msgs_" + id) || "[]");
+  feed.innerHTML = "";
+  for (const m of saved) {
+    const bubble = el("div", `msg ${m.role}`);
+    bubble.textContent = m.content;
+    feed.appendChild(bubble);
+  }
+  feed.scrollTop = feed.scrollHeight;
 }
-function listThreads() {
-  const all = JSON.parse(localStorage.getItem(LS_THREADS) || "{}");
-  return Object.values(all).sort((a,b)=>b.ts-a.ts);
+function saveMessage(role, content) {
+  const key = "cm_msgs_" + sessionId;
+  const arr = JSON.parse(localStorage.getItem(key) || "[]");
+  arr.push({ role, content });
+  localStorage.setItem(key, JSON.stringify(arr));
 }
-function truncate(text, n=80){ return text.length>n? text.slice(0,n)+"…": text; }
 
-/* ---------- UI builders ---------- */
-function bubble(role, text, extraClass="") {
-  const div = document.createElement("div");
-  div.className = `msg ${role} ${extraClass}`.trim();
-  div.textContent = text;
-  return div;
-}
-function addBubble(role, text) {
-  const el = bubble(role, text);
-  feedEl.appendChild(el);
-  feedEl.scrollTop = feedEl.scrollHeight;
-  return el;
-}
-async function typewriter(el, text, delay=18) {
-  el.textContent = "";
+// Typewriter render
+async function typewriterAppend(text) {
+  const bubble = el("div", "msg assistant");
+  feed.appendChild(bubble);
+  feed.scrollTop = feed.scrollHeight;
+
   for (const ch of text) {
-    el.textContent += ch;
-    // Keep view scrolled while typing
-    feedEl.scrollTop = feedEl.scrollHeight;
-    await new Promise(r => setTimeout(r, delay));
+    bubble.textContent += ch;
+    await new Promise(r => setTimeout(r, 8)); // smooth typing
+    if (bubble === null) break;
+    feed.scrollTop = feed.scrollHeight;
   }
 }
 
-/* ---------- Health badge ---------- */
-async function checkHealth() {
-  // Show temporary “Checking…”
-  if (topbar && !topbar.dataset.healthOnce) {
-    const s = document.createElement("span");
-    s.style.marginLeft = "8px";
-    s.style.fontSize = "12px";
-    s.style.opacity = "0.85";
-    s.textContent = " • Checking…";
-    topbar.appendChild(s);
-  }
+// Update health/model UI
+function setHealth(ok, modelText) {
+  const color = ok ? "#22c55e" : "#ef4444";
+  dotSmall.style.background = color;
+  topDot.style.background = color;
+  healthLabel.textContent = ok ? "Healthy" : "Error";
+  topText.textContent = ok ? "Healthy" : "Error";
+  if (modelText) modelBadge.textContent = `Model: ${modelText}`;
+}
+
+// ---------- Network ----------
+async function pingHealth() {
   try {
-    const res = await fetch(HEALTH_URL, {
+    const r = await fetch(HEALTH_URL, {
       headers: { "x-app-key": APP_KEY }
     });
-    const data = await res.json();
-    if (healthDot) healthDot.className = "dot dot-ok";
-    if (healthLbl) healthLbl.title = `Model: ${data.model || "unknown"}`;
-    if (topbar && !topbar.dataset.healthOnce) {
-      const ok = document.createElement("span");
-      ok.style.marginLeft = "8px";
-      ok.style.fontSize = "12px";
-      ok.style.opacity = "0.85";
-      ok.textContent = ` • ${data.model || "model"}`;
-      topbar.appendChild(ok);
-      topbar.dataset.healthOnce = "1";
-    }
+    const json = await r.json();
+    setHealth(true, json.model || "");
+    return json.model || "";
   } catch (e) {
-    if (healthDot) healthDot.className = "dot dot-bad";
-    if (topbar && !topbar.dataset.healthOnce) {
-      const bad = document.createElement("span");
-      bad.style.marginLeft = "8px";
-      bad.style.fontSize = "12px";
-      bad.style.opacity = "0.85";
-      bad.textContent = " • Proxy error";
-      topbar.appendChild(bad);
-      topbar.dataset.healthOnce = "1";
-    }
+    setHealth(false);
+    console.error(e);
+    return "";
   }
 }
 
-/* ---------- Threads rail ---------- */
-function renderThreads() {
-  if (!threadsEl) return;
-  threadsEl.innerHTML = "";
-  for (const t of listThreads()) {
-    const firstUser = (t.messages || []).find(m => m.role === "user");
-    const btn = document.createElement("button");
-    btn.className = "thread";
-    btn.textContent = truncate(firstUser?.content || "New chat");
-    btn.onclick = () => {
-      threadId = t.id;
-      drawThread(t.messages || []);
-    };
-    threadsEl.appendChild(btn);
-  }
-}
-function drawThread(messages) {
-  feedEl.innerHTML = "";
-  for (const m of messages) {
-    feedEl.appendChild(bubble(m.role, m.content));
-  }
-  feedEl.scrollTop = feedEl.scrollHeight;
-}
+async function sendChat(userText) {
+  // Add user bubble
+  const u = el("div", "msg user", userText);
+  feed.appendChild(u);
+  feed.scrollTop = feed.scrollHeight;
 
-/* ---------- Message gathering ---------- */
-function currentMessages() {
-  const nodes = [...feedEl.querySelectorAll(".msg")];
-  return nodes.map(n => {
-    const role = n.classList.contains("user") ? "user" : "assistant";
-    return { role, content: n.textContent || "" };
+  saveMessage("user", userText);
+
+  // POST to proxy (model decided by proxy; we don't set one here)
+  const resp = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-app-key": APP_KEY
+    },
+    body: JSON.stringify({ messages: [{ role: "user", content: userText }] })
   });
-}
 
-/* ---------- Chat send (NO temperature) ---------- */
-async function sendMessage() {
-  const text = (inputEl.value || "").trim();
-  if (!text) return;
+  // Read exposed headers for proof
+  const headerModel = resp.headers.get("X-CogMyra-Model");
+  const headerHash  = resp.headers.get("X-CogMyra-Prompt-Hash");
+  if (headerModel) modelBadge.textContent = `Model: ${headerModel}`;
+  if (headerModel) setHealth(true, headerModel);
 
-  // Ensure a thread
-  if (!threadId) threadId = nowId();
+  let data;
+  try { data = await resp.json(); } catch { data = {}; }
 
-  // User bubble
-  const userEl = addBubble("user", text);
+  if (!resp.ok || !data?.choices?.[0]?.message?.content) {
+    const err = el("div", "msg error", "Error talking to CogMyra.");
+    feed.appendChild(err);
+    setHealth(false, headerModel || "");
+    return;
+  }
 
-  // Placeholder assistant bubble (we'll type into it)
-  const botEl = addBubble("assistant", "…");
+  const content = data.choices[0].message.content;
 
-  // Clear composer
-  inputEl.value = "";
-  inputEl.focus();
+  // Typewriter the reply
+  await typewriterAppend(content);
+  saveMessage("assistant", content);
 
-  try {
-    const messages = [...currentMessages(), { role: "user", content: text }];
-
-    const res = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-app-key": APP_KEY,
-      },
-      // IMPORTANT: no temperature for GPT-5
-      body: JSON.stringify({ messages })
-    });
-
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content || "(no content)";
-    await typewriter(botEl, content, 16);
-
-    // Persist
-    saveThread(threadId, currentMessages());
-  } catch (err) {
-    botEl.classList.add("error");
-    botEl.textContent = "Error talking to CogMyra proxy.";
+  // After first message, add to history rail
+  if (!threads.find(t => t.id === sessionId)) {
+    pushThreadPreview(userText);
   }
 }
 
-/* ---------- Wire events ---------- */
-function wireUI() {
-  // Enter to send
-  inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-  sendBtn.addEventListener("click", sendMessage);
-
-  // New chat
-  if (newChatBtn) {
-    newChatBtn.onclick = () => {
-      threadId = nowId();
-      feedEl.innerHTML = "";
-      const hello = addBubble("assistant", "Hello, I’m CogMyra.");
-      typewriter(hello, "Hello, I’m CogMyra.", 10); // quick intro
-      saveThread(threadId, currentMessages());
-    };
+// ---------- Events ----------
+sendBtn.onclick = async () => {
+  const txt = (input.value || "").trim();
+  if (!txt) return;
+  input.value = "";
+  await sendChat(txt);
+};
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendBtn.click();
   }
+});
+newBtn.onclick = () => {
+  sessionId = crypto.randomUUID();
+  feed.innerHTML = "";
+  input.focus();
+};
+pingBtn.onclick = () => pingHealth();
 
-  // Load latest or start fresh
-  const latest = listThreads()[0];
-  if (latest) {
-    threadId = latest.id;
-    drawThread(latest.messages || []);
-  } else {
-    threadId = nowId();
-    const hello = addBubble("assistant", "Hello, I’m CogMyra.");
-    typewriter(hello, "Hello, I’m CogMyra.", 10);
-    saveThread(threadId, currentMessages());
-  }
+// ---------- Boot ----------
+renderThreads();
+loadThread(sessionId);
+(async () => {
+  // Show an initial hello
+  const hello = el("div", "msg assistant", "Hello, I’m CogMyra.");
+  feed.appendChild(hello);
 
-  renderThreads();
-  checkHealth();
-}
-
-/* ---------- Boot ---------- */
-document.addEventListener("DOMContentLoaded", wireUI);
+  // Check health/model on load and set badge
+  const model = await pingHealth();
+  if (!model) modelBadge.textContent = "Model: (unknown)";
+})();

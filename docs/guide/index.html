@@ -4,10 +4,11 @@
   <meta charset="utf-8" />
   <title>CogMyra Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- cache-bust (bump this number any time you don't see changes) -->
-  <link rel="stylesheet" href="/guide/styles.css?v=6" />
+  <!-- styles -->
+  <link rel="stylesheet" href="/guide/styles.css?v=7" />
 </head>
 <body>
+  <!-- Top bar -->
   <div class="topbar">
     <div class="brand">
       <div class="avatar">CM</div>
@@ -16,34 +17,44 @@
         <div class="subtitle">Guide</div>
       </div>
     </div>
-    <div class="topbar-right">
-      <span id="health-dot" class="dot dot-muted"></span>
-      <span id="health-text" class="muted">Checking…</span>
+
+    <!-- Right side status -->
+    <div class="top-right">
+      <span class="health-dot" id="health-dot"></span>
+      <span id="health-text">Checking…</span>
+      <span class="badge" id="model-badge">Model: …</span>
       <button id="new-chat" class="primary">New Chat</button>
     </div>
   </div>
 
+  <!-- Shell -->
   <div class="shell">
-    <!-- History rail -->
+    <!-- History -->
     <aside class="history">
       <div class="section-title">History</div>
       <div id="threads" class="threads"></div>
+
       <div class="rail-footer">
-        <button id="ping" class="ghost">Ping health</button>
+        <button id="ping" class="ghost block">Ping health</button>
+        <div class="health-line">
+          <span class="dot dot-muted" id="dot"></span>
+          <span id="health-label">Not checked</span>
+        </div>
       </div>
     </aside>
 
-    <!-- Chat panel -->
+    <!-- Chat -->
     <main class="chat">
       <div id="feed" class="feed"></div>
 
-      <form id="composer" class="composer">
-        <input id="input" type="text" placeholder="Type a message…" autocomplete="off" />
-        <button id="send" class="primary" type="submit">Send</button>
-      </form>
+      <div class="composer">
+        <input id="input" type="text" placeholder="Type a message…" />
+        <button id="send" class="primary">Send</button>
+      </div>
     </main>
   </div>
 
-  <script type="module" src="/guide/app.js?v=6"></script>
+  <!-- app -->
+  <script type="module" src="/guide/app.js?v=7"></script>
 </body>
 </html>
