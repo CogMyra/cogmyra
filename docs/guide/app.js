@@ -16,7 +16,7 @@ const modelTag  = document.getElementById("modelTag");
 const threadsEl = document.getElementById("threads");
 
 // ===== Local storage model =====
-// threads: { [threadId]: { id, title, createdAt, messages: [{role,content}] } }
+// threads: { [threadId]: { id, title, createdAt, messages: [{role,content,kind?}] } }
 const LS_KEY = "cogmyra_guide_threads_v1";
 let threads = loadThreads();
 let activeId = null;
@@ -61,7 +61,7 @@ function current() {
 
 // ===== UI helpers =====
 function clear(el){ while(el.firstChild) el.removeChild(el.firstChild); }
-function bubble(role, text, kind="") {
+function makeBubble(role, text, kind="") {
   const d = document.createElement("div");
   d.className = `msg ${role}${kind ? " " + kind : ""}`;
   d.textContent = text;
@@ -72,11 +72,10 @@ function bubble(role, text, kind="") {
 function renderFeed() {
   clear(feedEl);
   const t = current();
-  for (const m of t.messages) bubble(m.role, m.content, m.kind || "");
+  for (const m of t.messages) makeBubble(m.role, m.content, m.kind || "");
 }
 function renderThreads() {
   clear(threadsEl);
-  // sort newest first
   const arr = Object.values(threads).sort((a,b)=>b.createdAt-a.createdAt);
   for (const t of arr) {
     const d = document.createElement("div");
@@ -109,6 +108,32 @@ function setHealth(status, msg, model) {
 function disableComposer(disabled) {
   sendBtn.disabled = disabled;
   inputEl.disabled = disabled;
+}
+
+// ===== Typewriter ("streaming") =====
+const TYPE_SPEED_CHARS_PER_SEC = 60; // adjust for faster/slower typing
+function typeIntoBubble(bubbleEl, fullText, onDone) {
+  // Clear existing and type text progressively
+  bubbleEl.textContent = "";
+  let i = 0;
+  let lastTs = 0;
+  const charsPerMs = TYPE_SPEED_CHARS_PER_SEC / 1000;
+
+  function step(ts) {
+    if (!lastTs) lastTs = ts;
+    const dt = ts - lastTs;
+    lastTs = ts;
+    i += Math.max(1, Math.floor(dt * charsPerMs));
+    const slice = fullText.slice(0, i);
+    bubbleEl.textContent = slice || " ";
+    feedEl.scrollTop = feedEl.scrollHeight;
+    if (i < fullText.length) {
+      requestAnimationFrame(step);
+    } else {
+      onDone && onDone();
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 // ===== Network =====
@@ -171,28 +196,35 @@ async function handleSend() {
   renderFeed();
   updateTitleFromFirstUserMessage(t);
 
-  // typing stub (optional)
-  const stub = { role: "assistant", content: "…" , kind: "pending" };
+  // add assistant bubble placeholder (empty) to type into
+  const assistantBubble = makeBubble("assistant", " ");
+  // remember the placeholder in state so a refresh still shows it
+  const stub = { role: "assistant", content: "", kind: "pending" };
   t.messages.push(stub);
   saveThreads();
-  renderFeed();
 
   try {
     const { text: reply, model } = await postChat(text);
-    // replace stub
-    const idx = t.messages.indexOf(stub);
-    if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: reply });
-    else t.messages.push({ role: "assistant", content: reply });
-    saveThreads();
-    renderFeed();
+
+    // animate typing into the on-screen bubble
+    typeIntoBubble(assistantBubble, reply, () => {
+      // when done, replace stub in state with final content
+      const idx = t.messages.indexOf(stub);
+      if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: reply });
+      else t.messages.push({ role: "assistant", content: reply });
+      saveThreads();
+      renderFeed(); // re-render to remove "pending" kind (keeps same text)
+    });
+
     if (model) modelTag.textContent = `· ${model}`;
   } catch (e) {
     console.error("[chat] error:", e);
+    assistantBubble.classList.add("error");
+    assistantBubble.textContent = "Sorry—request failed. Check console/logs.";
     const idx = t.messages.indexOf(stub);
     if (idx !== -1) t.messages.splice(idx, 1, { role: "assistant", content: "Sorry—request failed. Check console/logs.", kind: "error" });
     else t.messages.push({ role: "assistant", content: "Sorry—request failed. Check console/logs.", kind: "error" });
     saveThreads();
-    renderFeed();
   } finally {
     disableComposer(false);
     inputEl.focus();
@@ -222,7 +254,6 @@ if (!Object.keys(threads).length) {
   const id = createThread("Welcome");
   setActive(id);
 } else {
-  // keep last-open thread selected (latest by createdAt)
   const latest = Object.values(threads).sort((a,b)=>b.createdAt-a.createdAt)[0];
   setActive(latest.id);
 }
