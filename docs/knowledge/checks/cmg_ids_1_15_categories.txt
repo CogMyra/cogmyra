@@ -2,8 +2,6 @@
 2,Writing & Composition
 3,Science & Inquiry
 4,History, Civics & Social Studies
-4,History, Civics & Social Studies
-5,Reading, Literacy & Comprehension
 5,Reading, Literacy & Comprehension
 6,Language Learning & Multilingual Skills
 7,Arts, Creativity & Expression
@@ -11,7 +9,6 @@
 9,Study Skills & Executive Functioning
 10,Critical Thinking, Logic & Reasoning
 11,Career Readiness & Workforce Entry
-12,Digital Literacy & Media Navigation
 12,Digital Literacy & Media Navigation
 13,Global & Cultural Studies
 14,College Prep & Academic Transitions
