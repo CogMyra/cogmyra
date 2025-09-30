@@ -101,3 +101,7 @@ __pycache__/
 
 # Misc
 *.bak
+
+# node & macOS
+node_modules/
+.DS_Store
