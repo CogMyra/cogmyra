@@ -78,3 +78,26 @@ poetry.lock
 export.csv
 exports/
 docs/knowledge/src/*.bak
+# OS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock
+.pnpm-store/
+dist/
+build/
+.cache/
+.vite/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Misc
+*.bak
