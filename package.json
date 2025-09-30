@@ -1,0 +1,15 @@
+{
+  "name": "cogmyra-dev9",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "embed:build": "node scripts/embed/build.mjs"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

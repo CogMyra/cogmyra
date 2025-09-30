@@ -77,3 +77,4 @@ poetry.lock
 # local exports
 export.csv
 exports/
+docs/knowledge/src/*.bak
