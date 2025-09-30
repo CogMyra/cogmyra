@@ -1,0 +1,52 @@
+1,Math & Numeracy
+2,Writing & Composition
+3,Science & Inquiry
+4,History, Civics & Social Studies
+5,Reading, Literacy & Comprehension
+6,Language Learning & Multilingual Skills
+7,Arts, Creativity & Expression
+8,Social-Emotional Learning (SEL)
+9,Study Skills & Executive Functioning
+10,Critical Thinking, Logic & Reasoning
+11,Career Readiness & Workforce Entry
+12,Digital Literacy & Media Navigation
+13,Global & Cultural Studies
+14,College Prep & Academic Transitions
+15,Debate, Rhetoric & Public Speaking
+1,Math & Numeracy
+2,Writing & Composition
+3,Science & Inquiry
+4,History, Civics & Social Studies
+5,Reading, Literacy & Comprehension
+6,Language Learning & Multilingual Skills
+7,Arts, Creativity & Expression
+8,Social-Emotional Learning (SEL)
+9,Study Skills & Executive Functioning
+10,Critical Thinking, Logic & Reasoning
+11,Career Readiness & Workforce Entry
+12,Digital Literacy & Media Navigation
+13,Global & Cultural Studies
+14,College Prep & Academic Transitions
+15,Debate, Rhetoric & Public Speaking
+16,Research & Inquiry Skills
+17,Wellness & Personal Development
+18,Family, Identity & Relationships
+19,Project-Based Learning & Creativity
+20,AI Literacy & Future Thinking
+21,Workplace Development & Professional Skills
+22,Upskilling, Reskilling & Lifelong Learning
+23,Ethics, Philosophy & Moral Reasoning
+24,Special Education & Neurodiverse Learning
+25,Prompt Engineering & AI Collaboration
+26,Group Learning, Peer Interaction & Dialogue
+16,Research & Inquiry Skills
+17,Wellness & Personal Development
+18,Family, Identity & Relationships
+19,Project-Based Learning & Creativity
+20,AI Literacy & Future Thinking
+21,Workplace Development & Professional Skills
+22,Upskilling, Reskilling & Lifelong Learning
+23,Ethics, Philosophy & Moral Reasoning
+24,Special Education & Neurodiverse Learning
+25,Prompt Engineering & AI Collaboration
+26,Group Learning, Peer Interaction & Dialogue
