@@ -11,5 +11,8 @@
   },
   "dependencies": {
     "openai": "^4.104.0"
+  },
+  "engines": {
+    "node": ">=20 <21"
   }
 }
