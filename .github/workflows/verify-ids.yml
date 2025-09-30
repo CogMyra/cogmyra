@@ -25,3 +25,18 @@ jobs:
           LAST=$(jq -r '.records|map(select(.file=="CMG_PromptCategoryFramework_v1.0_2025-08-05.csv"))|sort_by(.chunkIndex)[-1].chunkIndex' docs/knowledge/index.json)
           test "$LEN" = "26"
           test "$FIRST$LAST" = "025"
+
+      - name: Compare canonical category list
+        run: |
+          set -euo pipefail
+          # Recreate "ID,Category" lines from the rebuilt index
+          jq -r '
+            .records
+            | map(select(.file=="CMG_PromptCategoryFramework_v1.0_2025-08-05.csv"))
+            | sort_by(.id)
+            | .[]
+            | "\(.id),\(.title)"
+          ' docs/knowledge/index.json > /tmp/from_index.txt
+
+          echo "Diff vs canonical (docs/knowledge/checks/cmg_ids_all_categories.txt):"
+          diff -u docs/knowledge/checks/cmg_ids_all_categories.txt /tmp/from_index.txt
