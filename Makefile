@@ -1,10 +1,12 @@
 .PHONY: ids-% ids ids-all verify-all clean
 IDS_DIR := docs/knowledge/checks
+CSV := docs/knowledge/src/CMG_PromptCategoryFramework_v1.0_2025-08-05.csv
 
 # Build a specific range: make ids-1-15  (RUN WITH `make`, DO NOT paste recipes in shell)
 ids-%:
+	@mkdir -p $(IDS_DIR)
 	@lo=$(word 1,$(subst -, ,$*)); hi=$(word 2,$(subst -, ,$*)); \
-	python3 scripts/extract_ids.py $(IDS_DIR)/cmg_ids_$*_categories.txt $$lo $$hi; \
+	python3 scripts/extract_ids_from_csv.py $(CSV) $(IDS_DIR)/cmg_ids_$*_categories.txt $$lo $$hi; \
 	sed -n '1,25p' $(IDS_DIR)/cmg_ids_$*_categories.txt; \
 	# if empty (no rows found), delete so it won't pollute ids-all
 	test -s $(IDS_DIR)/cmg_ids_$*_categories.txt || rm -f $(IDS_DIR)/cmg_ids_$*_categories.txt
