@@ -1,0 +1,11 @@
+16,Research & Inquiry Skills
+17,Wellness & Personal Development
+18,Family, Identity & Relationships
+19,Project-Based Learning & Creativity
+20,AI Literacy & Future Thinking
+21,Workplace Development & Professional Skills
+22,Upskilling, Reskilling & Lifelong Learning
+23,Ethics, Philosophy & Moral Reasoning
+24,Special Education & Neurodiverse Learning
+25,Prompt Engineering & AI Collaboration
+26,Group Learning, Peer Interaction & Dialogue
