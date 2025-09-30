@@ -29,3 +29,14 @@ verify-all:
 
 clean:
 	@rm -f $(IDS_DIR)/cmg_ids_*-[0-9]*_categories.txt $(IDS_DIR)/cmg_ids_all_categories.txt
+
+.PHONY: rebuild-index check-index
+
+rebuild-index:
+python3 scripts/rebuild_index_from_csv.py
+
+check-index:
+@echo "Records for CMG CSV:" && \
+jq -r '.records|map(select(.file=="CMG_PromptCategoryFramework_v1.0_2025-08-05.csv"))|length' docs/knowledge/index.json && \
+echo "First/Last chunkIndex (expect 0 and 25):" && \
+jq -r '.records|map(select(.file=="CMG_PromptCategoryFramework_v1.0_2025-08-05.csv"))|sort_by(.chunkIndex)[0,-1].chunkIndex' docs/knowledge/index.json
