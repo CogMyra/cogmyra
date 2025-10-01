@@ -1,3 +1,4 @@
+[![CI](https://github.com/MichaelFAngotti/cogmyra-dev/actions/workflows/ci.yml/badge.svg)](https://github.com/MichaelFAngotti/cogmyra-dev/actions/workflows/ci.yml)
 # CogMyra
 
 ## Install
