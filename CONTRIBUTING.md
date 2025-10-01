@@ -22,4 +22,3 @@ poetry run pre-commit install
 ```
 
 This will run Ruff checks and formatting on commit.
-
