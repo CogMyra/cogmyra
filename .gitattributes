@@ -1,0 +1,12 @@
+* text=auto eol=lf
+
+# Treat common binaries as binary (no EOL normalization)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
