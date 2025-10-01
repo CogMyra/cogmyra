@@ -1,8 +1,26 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.4
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
     hooks:
-      - id: ruff
-        args: ["--fix"]
-      - id: ruff-format
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
 
+  - repo: local
+    hooks:
+      - id: rebuild-index
+        name: Rebuild knowledge index from CSV
+        entry: bash -c 'make rebuild-index'
+        language: system
+        pass_filenames: false
+
+      - id: verify-index
+        name: Verify index has 26 records and chunkIndex 0..25
+        entry: bash -c 'make check-index >/dev/null'
+        language: system
+        pass_filenames: false

@@ -19,3 +19,9 @@ cogmyra greet World
 - One-off: `COGMYRA_ADMIN_KEY=... ./scripts/export_logs.sh` (creates `~/Downloads/logs-YYYYmmdd-HHMMSS.csv`)
 - Scheduled (macOS): LaunchAgent `com.cogmyra.export-logs` runs daily at 17:30. Logs at `/tmp/com.cogmyra.export-logs.{out,err}`.
 
+
+## Contributing
+
+- Don’t commit `node_modules/` (already in `.gitignore`).
+- Run `make rebuild-index && make check-index` before opening a PR.
+- CI (**verify-ids**) must pass.
