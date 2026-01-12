@@ -25,4 +25,3 @@ This repository is set up for agent-assisted development. Please follow these gu
 
 - Avoid adding new tools unless justified. Favor Poetry groups for dev/test dependencies.
 - If a task spans multiple steps, maintain a brief plan and update it as you go.
-

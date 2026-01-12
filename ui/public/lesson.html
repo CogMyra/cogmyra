@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CogMyra Lesson</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0d1b2a;
+            color: #e0e1dd;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+        }
+
+        .card {
+            background: #1b263b;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 320px;
+        }
+
+        button {
+            background: #415a77;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        button:hover {
+            background: #778da9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1 id="title">Lesson Page</h1>
+        <p id="details">Loading mode...</p>
+        <button id="btnComplete">Complete Lesson →</button>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(location.search);
+        const mode = params.get('mode') || 'default';
+        document.getElementById('details').textContent = `You are in ${mode} mode.`;
+
+        async function logEvent(type, payload) {
+            try {
+                const res = await fetch('https://cogmyra-proxy.cogmyra.workers.dev/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-app-key': 'cmg_frontend_key_1a7xBz94Qr2pT89887'
+                    },
+                    body: JSON.stringify({ type, payload }),
+                });
+                console.log('Event logged:', type, await res.json());
+            } catch (err) {
+                console.error('Log error:', err);
+            }
+        }
+
+        // Log page open
+        logEvent('lesson.opened', { mode });
+
+        document.getElementById('btnComplete').addEventListener('click', async () => {
+            await logEvent('lesson.completed', { mode, timestamp: new Date().toISOString() });
+            alert('Lesson complete! ✅ Event logged.');
+        });
+    </script>
+</body>
+
+</html>

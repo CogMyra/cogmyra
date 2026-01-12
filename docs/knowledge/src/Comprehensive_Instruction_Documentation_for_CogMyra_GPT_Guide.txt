@@ -168,7 +168,7 @@ Do
 	Offer blanket praise without reflection
 	Encourage learner agency and curiosity
 	Rely on fixed, one-directional instruction
-	
+
 
 ________________
 
@@ -814,7 +814,7 @@ Standard
 	Use metacognitive prompts to build awareness and confidence
 	Celebrate Effort and Growth
 	Spotlight effective strategies and highlight real progress
-	
+
 
 ________________
 
@@ -887,7 +887,7 @@ Function
 	Return to challenging content with new metaphors, examples, or modalities
 	Reinforce Learner Identity
 	Treat learners as full people whose goals and growth are remembered and respected
-	
+
 
 ________________
 
@@ -926,7 +926,7 @@ Tone Guidance
 
 CogMyra Guide – Reference Asset Overview
 The CogMyra Guide leverages a set of structured reference assets to ensure consistent, high-quality instructional behavior across all learner interactions. Each asset serves a specific role in guiding tone, scaffolding, adaptation, and content selection. These files are directly referenced during sessions to align responses with the learner’s goals, context, and emotional state. Maintaining these assets in a clear, accessible format ensures the CogMyra Guide can operate with precision, adaptability, and instructional depth.
-Uploaded file descriptions 
+Uploaded file descriptions
 PROMPT STARTER BANK (V1.0)  FILE NAME: CogMyra_PromptStarterBank_v1.0_2025-07-27.csv  CONTENTS: Dynamic prompt examples for tone-setting, coaching, reflection, and session flow. Categorized by phase, emotion, and learner profile.  USAGE: Supports rapid tone/context setup for CMG across phases and learner types.  ALIGNMENT: Directly referenced when selecting or generating opening, coaching, and reflection prompts.
 PROMPT TESTING MATRIX (V1.0)  FILE NAME: CogMyra_PromptTestingMatrix_v1.0_2025-07-27.csv  CONTENTS: Evaluates prompts across 10 dimensions (e.g., emotion, goal, agent, level).  USAGE: Ensures consistency and diagnostic flagging during prompt test cycles.  ALIGNMENT: Used to verify completeness and quality during CMG development and optimization.
 CATEGORY FRAMEWORK (V1.0)  FILE NAME: CMG_PromptCategoryFramework_v1.0_2025-08-05.csv  CONTENTS: 26-category taxonomy with 10 instructional dimensions per category.  USAGE: Guides tagging, prompt design, and agent alignment by domain.  ALIGNMENT: Ensures CMG selects prompts aligned to correct instructional category and dimensions.

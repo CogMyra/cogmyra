@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CogMyra Onboarding</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0d1b2a;
+            color: #e0e1dd;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+        }
+
+        form {
+            background: #1b263b;
+            padding: 2rem;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            width: 300px;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9rem;
+        }
+
+        input,
+        select,
+        button {
+            margin-top: 0.3rem;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 6px;
+        }
+
+        button {
+            background: #415a77;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #778da9;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Welcome! 👋</h1>
+    <form id="onboardForm">
+        <label>
+            Your Role:
+            <select name="role" required>
+                <option value="">Select one</option>
+                <option value="student">Student</option>
+                <option value="educator">Educator</option>
+                <option value="professional">Professional</option>
+            </select>
+        </label>
+
+        <label>
+            Grade/Level:
+            <input type="text" name="grade" placeholder="e.g. College sophomore" required />
+        </label>
+
+        <label>
+            Interests:
+            <input type="text" name="prefs" placeholder="AI, Writing, Music..." required />
+        </label>
+
+        <button type="submit">Continue →</button>
+    </form>
+
+    <script>
+        // Small helper: wrap fetch with JSON + cookies
+        async function api(path, opts = {}) {
+            const res = await fetch(`https://cogmyra-proxy.cogmyra.workers.dev${path}`, {
+                method: opts.method || 'GET',
+                headers: {
+                    'x-app-key': 'cmg_frontend_key_1a7xBz94Qr2pT89887',
+                    ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+                    ...(opts.headers || {}),
+                },
+                body: opts.body ? JSON.stringify(opts.body) : undefined,
+                credentials: 'include', // <-- ensure cmg_uid cookie is set/sent
+            });
+            const text = await res.text();           // better error visibility
+            let json;
+            try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+            if (!res.ok) {
+                const msg = json?.error || json?.message || text || `${res.status} ${res.statusText}`;
+                throw new Error(msg);
+            }
+            return json;
+        }
+
+        document.getElementById('onboardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = Object.fromEntries(new FormData(e.target)); // {role, grade, prefs}
+
+            try {
+                // 🔹 Save a minimal profile with fields your API definitely accepts
+                //    (email, display_name, anon). Keep the full form data for events.
+                const profileBody = {
+                    display_name: `${data.role} · ${data.grade}`.trim(),
+                    anon: 1
+                };
+
+                const saved = await api('/api/profile', {
+                    method: 'POST',
+                    body: profileBody
+                });
+                console.log('Profile saved:', saved);
+
+                // 🔹 Log onboarding completed (store the full form data in payload)
+                await api('/api/events', {
+                    method: 'POST',
+                    body: {
+                        type: 'onboarding.completed',
+                        payload: data
+                    }
+                });
+
+                alert('✅ Profile saved! Onboarding logged.');
+                // You can deep-link later; for now go to chat demo with default mode:
+                window.location.href = '/chat-demo.html?mode=default';
+            } catch (err) {
+                console.error('Error saving profile:', err);
+                alert('⚠️ Connection or server error. Details in console.');
+            }
+        });
+    </script>
+</body>
+
+</html>

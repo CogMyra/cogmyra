@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CogMyra Feedback</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0d1b2a;
+            color: #e0e1dd;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .card {
+            background: #1b263b;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 320px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 1rem;
+        }
+
+        .stars {
+            display: flex;
+            justify-content: center;
+            gap: .5rem;
+            margin-bottom: 1rem;
+        }
+
+        .star {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #778da9;
+        }
+
+        .star.selected {
+            color: #f5d742;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            border-radius: 8px;
+            border: none;
+            padding: .5rem;
+            resize: none;
+        }
+
+        button {
+            background: #415a77;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: .6rem 1rem;
+            margin-top: 1rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #778da9;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>We’d love your feedback 💬</h1>
+        <div class="stars" id="stars"></div>
+        <textarea id="comment" placeholder="What did you think?"></textarea>
+        <button id="submit">Send Feedback →</button>
+    </div>
+
+    <script>
+        // --- Star selector ---
+        const starsContainer = document.getElementById('stars');
+        let rating = 0;
+        for (let i = 1; i <= 5; i++) {
+            const star = document.createElement('span');
+            star.textContent = '★';
+            star.classList.add('star');
+            star.addEventListener('click', () => {
+                rating = i;
+                document.querySelectorAll('.star').forEach((s, idx) => {
+                    s.classList.toggle('selected', idx < i);
+                });
+            });
+            starsContainer.appendChild(star);
+        }
+
+        async function logEvent(type, payload) {
+            try {
+                const res = await fetch('https://cogmyra-proxy.cogmyra.workers.dev/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-app-key': 'cmg_frontend_key_1a7xBz94Qr2pT89887'
+                    },
+                    body: JSON.stringify({ type, payload }),
+                });
+                console.log('Feedback event logged:', await res.json());
+            } catch (err) {
+                console.error('Feedback log error:', err);
+            }
+        }
+
+        document.getElementById('submit').addEventListener('click', async () => {
+            const comment = document.getElementById('comment').value.trim();
+            if (rating === 0) return alert('Please select a rating ⭐');
+            await logEvent('feedback.sent', { rating, comment, timestamp: new Date().toISOString() });
+            alert('✅ Feedback sent — thank you!');
+        });
+    </script>
+</body>
+
+</html>

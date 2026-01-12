@@ -1,31 +1,154 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>CogMyra Chat Demo v1 (via Proxy)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{--bg:#0b0f14;--panel:#121924;--muted:#7c8aa5;--acc:#7bdcff;--ok:#9cf0b0;--err:#ff9ca6;--me:#1f2b3a;--bot:#0f2536;--border:#233043}
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:#e9f0fb;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    h1{margin:16px;font-size:20px}
-    .wrap{max-width:1100px;margin:0 auto;padding:12px}
-    .grid{display:grid;grid-template-columns:280px 1fr;gap:14px}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    input,textarea,button{width:100%;border-radius:10px;border:1px solid var(--border);background:#0e1420;color:#e9f0fb;padding:10px}
-    textarea{min-height:76px;resize:vertical}
-    .btn{cursor:pointer;background:#162033;border-color:#2a3b55}.btn:hover{filter:brightness(1.1)}
-    .row{display:flex;gap:8px}
-    .tiny{font-size:12px;color:var(--muted)}
-    .chat{background:var(--panel);border:1px solid var(--border);border-radius:12px;height:420px;overflow:auto;padding:10px}
-    .msg{max-width:78%;margin:6px 0;padding:10px 12px;border-radius:14px;border:1px solid var(--border);white-space:pre-wrap}
-    .me{margin-left:auto;background:var(--me)} .bot{margin-right:auto;background:var(--bot)}
-    .pill{display:inline-block;background:#0e1624;border:1px solid var(--border);color:var(--muted);padding:4px 8px;border-radius:999px;font-size:12px}
-    .meta,.log{background:#0e1420;border:1px solid var(--border);border-radius:12px;padding:10px}
-    .meta{min-height:84px}
-    .log{height:140px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap}
+    :root {
+      --bg: #0b0f14;
+      --panel: #121924;
+      --muted: #7c8aa5;
+      --acc: #7bdcff;
+      --ok: #9cf0b0;
+      --err: #ff9ca6;
+      --me: #1f2b3a;
+      --bot: #0f2536;
+      --border: #233043
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: #e9f0fb;
+      font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial
+    }
+
+    h1 {
+      margin: 16px;
+      font-size: 20px
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 12px
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 14px
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px
+    }
+
+    input,
+    textarea,
+    button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0e1420;
+      color: #e9f0fb;
+      padding: 10px
+    }
+
+    textarea {
+      min-height: 76px;
+      resize: vertical
+    }
+
+    .btn {
+      cursor: pointer;
+      background: #162033;
+      border-color: #2a3b55
+    }
+
+    .btn:hover {
+      filter: brightness(1.1)
+    }
+
+    .row {
+      display: flex;
+      gap: 8px
+    }
+
+    .tiny {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .chat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      height: 420px;
+      overflow: auto;
+      padding: 10px
+    }
+
+    .msg {
+      max-width: 78%;
+      margin: 6px 0;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      white-space: pre-wrap
+    }
+
+    .me {
+      margin-left: auto;
+      background: var(--me)
+    }
+
+    .bot {
+      margin-right: auto;
+      background: var(--bot)
+    }
+
+    .pill {
+      display: inline-block;
+      background: #0e1624;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px
+    }
+
+    .meta,
+    .log {
+      background: #0e1420;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px
+    }
+
+    .meta {
+      min-height: 84px
+    }
+
+    .log {
+      height: 140px;
+      overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      white-space: pre-wrap
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <h1>CogMyra Chat Demo <span class="pill">v1</span></h1>
@@ -39,13 +162,16 @@
         <textarea id="system" placeholder="Override via a system message (optional)"></textarea>
         <div class="row" style="margin-top:10px">
           <button id="btnHealth" class="btn">Check Health</button>
-          <button id="btnClear" class="btn">Clear Chat</button>
+          <button id="btnClear" class="btn"
+            onclick="document.getElementById('chat').innerHTML='';document.getElementById('meta').textContent='';document.getElementById('log').textContent='';">Clear
+            Chat</button>
         </div>
         <p class="tiny" style="margin-top:8px">Tip: API Base points at your Cloudflare Worker proxy.</p>
       </div>
       <div>
         <label>Message</label>
-        <textarea id="msg">From sample.md in our knowledge index, summarize the CogMyra Teaching Frame exactly as written. Include the step sequence and tone. Cite chunks.</textarea>
+        <textarea
+          id="msg">From sample.md in our knowledge index, summarize the CogMyra Teaching Frame exactly as written. Include the step sequence and tone. Cite chunks.</textarea>
         <button id="btnAsk" class="btn" style="margin:8px 0;width:100%">Ask</button>
         <div class="chat" id="chat"></div>
         <p class="tiny" style="margin:8px 0 4px">Last response metadata</p>
@@ -55,16 +181,49 @@
       </div>
     </div>
   </div>
+
   <script>
-    const el = id=>document.getElementById(id);
-    const chat=el('chat'), meta=el('meta'), log=el('log');
-    function appendLog(line,obj){const t=new Date().toISOString().replace('T',' ').replace('Z','');let out=`[${t}] ${line}`;if(obj!==undefined){try{out+=' '+JSON.stringify(obj)}catch{}}log.textContent+=(log.textContent?'\n':'')+out;log.scrollTop=log.scrollHeight}
-    function bubble(txt,who){const d=document.createElement('div');d.className='msg '+(who==='me'?'me':'bot');d.textContent=txt;chat.appendChild(d);chat.scrollTop=chat.scrollHeight}
-    async function checkHealth(){const base=el('base').value.trim(),key=el('key').value.trim();try{const r=await fetch(base+'/api/health',{headers:{'x-app-key':key}});appendLog('GET '+base+'/api/health',{status:r.status,headers:Object.fromEntries(r.headers.entries())});const j=await r.json();appendLog('',{body:j});const g=j.rag||{};bubble(`Health OK. RAG index: count=${g.count??'—'}, dims=${g.dims??'—'}`,'bot')}catch(e){appendLog('health error',e?.message);bubble('Health check failed. See Network log.','bot')}}
-    function payload(){const msgs=[];const s=el('system').value.trim();if(s)msgs.push({role:'system',content:s});msgs.push({role:'user',content:el('msg').value});return{messages:msgs}}
-    async function ask(){const base=el('base').value.trim(),key=el('key').value.trim(),body=payload();bubble(body.messages.at(-1).content,'me');try{const r=await fetch(base+'/api/chat',{method:'POST',headers:{'content-type':'application/json','x-app-key':key},body:JSON.stringify(body)});appendLog('POST '+base+'/api/chat',{headers:{'content-type':'application/json','x-app-key':'(set)'},body});if(!r.ok){const t=await r.text();appendLog('chat error body',t);bubble(`Proxy error ${r.status}. See Network log.`,'bot');return}const j=await r.json();appendLog('',j);bubble(j?.choices?.[0]?.message?.content ?? '(no content)','bot');meta.textContent=JSON.stringify({model:j.model,promptHash:j.promptHash,ragUsed:j.ragUsed,ragChars:j.ragChars,ragCitations:j.ragCitations},null,2)}catch(e){appendLog('ask catch',e?.message);bubble('Request failed. See Network log.','bot')}}
-    function clearChat(){chat.innerHTML='';meta.textContent='';log.textContent=''}
-    el('btnHealth').onclick=checkHealth;el('btnAsk').onclick=ask;el('btnClear').onclick=clearChat;checkHealth();
+    window.addEventListener("DOMContentLoaded", () => {
+      const elHealth = document.getElementById("btnHealth");
+      const elAsk = document.getElementById("btnAsk");
+
+      console.log("Loaded DOM:", { hasHealth: !!elHealth, hasAsk: !!elAsk });
+
+      // ---------- Check Health ----------
+      elHealth?.addEventListener("click", async () => {
+        const base = document.getElementById("base").value.trim();
+        const key = document.getElementById("key").value.trim();
+        if (!base || !key) return alert("Enter API Base and API Key first.");
+        const res = await fetch(`${base}/api/health`, {
+          headers: { "x-app-key": key },
+        });
+        const txt = await res.text();
+        console.log("Health result:", res.status, txt);
+        alert(res.ok ? "✅ Health OK" : `❌ Health failed: ${res.status}`);
+      });
+
+      // ---------- Ask ----------
+      elAsk?.addEventListener("click", async () => {
+        const base = document.getElementById("base").value.trim();
+        const key = document.getElementById("key").value.trim();
+        const msg = document.getElementById("msg").value.trim();
+        if (!base || !key || !msg) return alert("Missing info!");
+        console.log("Ask fired ->", msg);
+
+        const res = await fetch(`${base}/api/chat`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-app-key": key,
+          },
+          body: JSON.stringify({ mode: "learn", message: msg }),
+        });
+        const data = await res.json();
+        console.log("Chat response:", data);
+        alert("Response received! Check console for details.");
+      });
+    });
   </script>
 </body>
+
 </html>

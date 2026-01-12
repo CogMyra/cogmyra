@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pick a Mode</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0d1b2a;
+            color: #e0e1dd;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wrap {
+            width: min(900px, 92vw);
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0 0 1rem;
+        }
+
+        .grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .card {
+            background: #1b263b;
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, .08);
+        }
+
+        .card:hover {
+            border-color: #778da9;
+        }
+
+        .label {
+            opacity: .85;
+            margin-top: .5rem;
+            font-size: .95rem;
+        }
+
+        .small {
+            opacity: .65;
+            font-size: .85rem;
+            margin-top: .25rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>Choose a learning mode</h1>
+        <div id="grid" class="grid" aria-live="polite"></div>
+    </div>
+
+    <script>
+        const APP_KEY = 'cmg_frontend_key_1a7xBz94Qr2pT89887';
+        const API_BASE = 'https://cogmyra-proxy.cogmyra.workers.dev';
+
+        async function api(path, opts = {}) {
+            const res = await fetch(API_BASE + path, {
+                method: opts.method || 'GET',
+                headers: {
+                    'x-app-key': APP_KEY,
+                    ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+                    ...(opts.headers || {}),
+                },
+                credentials: 'include',
+                body: opts.body ? JSON.stringify(opts.body) : undefined,
+            });
+            const txt = await res.text();
+            let json; try { json = txt ? JSON.parse(txt) : {}; } catch { json = { raw: txt }; }
+            if (!res.ok) throw new Error(json?.error || txt || `${res.status} ${res.statusText}`);
+            return json;
+        }
+
+        function card(mode) {
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.tabIndex = 0;
+            div.innerHTML = `
+    <div class="id"><strong>${mode.id}</strong></div>
+    <div class="label">${mode.label || ''}</div>
+    <div class="small">Click to start</div>
+  `;
+            div.addEventListener('click', () => selectMode(mode));
+            div.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') selectMode(mode); });
+            return div;
+        }
+
+        async function selectMode(mode) {
+            try {
+                // log `mode.selected`
+                await api('/api/events', {
+                    method: 'POST',
+                    body: {
+                        type: 'mode.selected',
+                        payload: { id: mode.id, label: mode.label }
+                    }
+                });
+            } catch (e) {
+                console.warn('log failed (non-fatal):', e);
+            }
+            // deep link to chat/experience page with mode id
+            window.location.href = `/chat-demo.html?mode=${encodeURIComponent(mode.id)}`;
+        }
+
+        async function main() {
+            const grid = document.getElementById('grid');
+            grid.textContent = 'Loading modes…';
+            try {
+                const { modes } = await api('/api/modes');
+                grid.textContent = '';
+                modes.forEach(m => grid.appendChild(card(m)));
+                if (!modes?.length) grid.textContent = 'No modes available.';
+            } catch (err) {
+                console.error(err);
+                grid.textContent = 'Failed to load modes.';
+            }
+        }
+
+        main();
+    </script>
+</body>
+
+</html>

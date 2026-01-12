@@ -1,24 +1,89 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>CogMyra — Live Demos</title>
   <style>
-    body{margin:0;background:#0b1220;color:#e6e9f2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
-    .wrap{max-width:900px;margin:6rem auto;padding:0 1.25rem}
-    h1{font-size:2rem;margin:0 0 1rem}
-    p{opacity:.85;line-height:1.5}
-    .badges{margin:.75rem 0 2rem}
-    .badge{display:inline-block;background:#111a33;border:1px solid #1f2a48;border-radius:999px;padding:.25rem .75rem;margin-right:.5rem;font-size:.85rem}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.25rem}
-    a.card{display:block;text-decoration:none;color:inherit;background:#0e1830;border:1px solid #1e2b52;border-radius:16px;padding:1rem}
-    a.card:hover{border-color:#315fff;box-shadow:0 0 0 3px rgba(49,95,255,.15)}
-    .title{font-weight:600;margin:0 0 .25rem}
-    .desc{opacity:.8;font-size:.95rem;margin:0}
-    footer{opacity:.7;margin-top:2.5rem;font-size:.9rem}
+    body {
+      margin: 0;
+      background: #0b1220;
+      color: #e6e9f2;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, sans-serif
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 6rem auto;
+      padding: 0 1.25rem
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 1rem
+    }
+
+    p {
+      opacity: .85;
+      line-height: 1.5
+    }
+
+    .badges {
+      margin: .75rem 0 2rem
+    }
+
+    .badge {
+      display: inline-block;
+      background: #111a33;
+      border: 1px solid #1f2a48;
+      border-radius: 999px;
+      padding: .25rem .75rem;
+      margin-right: .5rem;
+      font-size: .85rem
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem
+    }
+
+    a.card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: #0e1830;
+      border: 1px solid #1e2b52;
+      border-radius: 16px;
+      padding: 1rem
+    }
+
+    a.card:hover {
+      border-color: #315fff;
+      box-shadow: 0 0 0 3px rgba(49, 95, 255, .15)
+    }
+
+    .title {
+      font-weight: 600;
+      margin: 0 0 .25rem
+    }
+
+    .desc {
+      opacity: .8;
+      font-size: .95rem;
+      margin: 0
+    }
+
+    footer {
+      opacity: .7;
+      margin-top: 2.5rem;
+      font-size: .9rem
+    }
   </style>
 </head>
+
 <body>
   <main class="wrap">
     <h1>CogMyra Demo Pages</h1>
@@ -39,5 +104,23 @@
     </section>
     <footer>© CogMyra</footer>
   </main>
+  <script>
+    // Global helper for calling the CogMyra API from frontend pages
+    async function api(path, opts = {}) {
+      const res = await fetch(`https://api.cogmyra.com${path}`, {
+        method: opts.method || 'GET',
+        headers: {
+          'x-app-key': 'cmg_frontend_key_1a7xBz94Qr2pT89887',
+          ...(opts.body ? { 'content-type': 'application/json' } : {}),
+          ...(opts.headers || {}),
+        },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        credentials: 'include', // ensures cmg_uid cookie is sent
+      });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return res.json();
+    }
+  </script>
 </body>
+
 </html>
