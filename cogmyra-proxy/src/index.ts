@@ -262,7 +262,40 @@ export default {
 				}
 				const body = await request.json().catch(() => ({}));
 				const messages: Array<{ role: string; content: string }> = body?.messages ?? [];
-				const t0 = Date.now();
+				        const indexUrl = env.INDEX_URL;
+        if (!indexUrl) {
+          const userQ = userPromptFrom(messages);
+          const context = "";
+          const sys = buildSystemPrompt(env);
+          const promptHash = await sha256Hex(sys);
+
+          const openai = await callChat(env, sys, userQ, context);
+
+          const h = cors(origin);
+          h.set("X-CogMyra-Model", env.MODEL || "gpt-5");
+          h.set("X-CogMyra-Prompt-Hash", promptHash);
+
+          const merged = {
+            ...openai,
+            model: openai.model || env.MODEL || "gpt-5",
+            ragUsed: false,
+            ragChars: 0,
+            ragCitations: [],
+          };
+
+          console.log(
+            JSON.stringify({
+              event_type: "chat_response_sent",
+              ts: new Date().toISOString(),
+              path: url.pathname,
+              status: 200,
+              latency_ms: Date.now() - t0,
+            })
+          );
+
+          return new Response(JSON.stringify(merged), { status: 200, headers: h });
+        }
+        const t0 = Date.now();
 				console.log(
 					JSON.stringify({
 						event_type: 'chat_message_received',
