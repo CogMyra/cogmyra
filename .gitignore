@@ -105,3 +105,6 @@ __pycache__/
 # node & macOS
 node_modules/
 .DS_Store
+
+# secrets
+cogmyra-proxy/.frontend_app_key.txt
