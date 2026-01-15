@@ -222,12 +222,52 @@ export default {
       return new Response(null, { headers: cors(origin) });
     }
 
-    const appKey = request.headers.get('x-app-key');
-    if (!appKey || appKey !== env.FRONTEND_APP_KEY) {
-      return textError('Forbidden: bad or missing x-app-key', origin, 403);
+    // App-key gate: required for everything EXCEPT browser telemetry ingest
+    if (url.pathname !== '/api/events') {
+      const appKey = request.headers.get('x-app-key');
+      if (!appKey || appKey !== env.FRONTEND_APP_KEY) {
+        return textError('Forbidden: bad or missing x-app-key', origin, 403);
+      }
     }
 
     try {
+      // Telemetry ingest (browser-safe)
+      if (url.pathname === '/api/events') {
+        if (request.method != 'POST') {
+          return textError('Method Not Allowed', origin, 405);
+        }
+
+        let body: any = null;
+        try {
+          body = await request.json();
+        } catch {
+          return textError('Bad Request: invalid JSON', origin, 400);
+        }
+
+        const evType = (body && typeof body.type === 'string') ? body.type : null;
+        const payload = (body && typeof body.payload === 'object') ? body.payload : {};
+        const ts = (body && typeof body.ts === 'string') ? body.ts : new Date().toISOString();
+
+        if (!evType) {
+          return textError('Bad Request: missing type', origin, 400);
+        }
+
+        // Log to Worker logs as an immediate proof of ingest.
+        console.log(JSON.stringify({
+          event_type: 'telemetry_event_ingested',
+          ts_ingest: new Date().toISOString(),
+          ts_client: ts,
+          type: evType,
+          payload,
+          path: request.headers.get('referer') || '',
+          ua: request.headers.get('user-agent') || '',
+          ip: request.headers.get('cf-connecting-ip') || '',
+        }));
+
+        const h = cors(origin);
+        return new Response(null, { status: 204, headers: h });
+      }
+
       if (url.pathname === '/api/health') {
         await ensureIndex(env);
 
