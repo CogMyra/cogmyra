@@ -30,7 +30,7 @@ const el = {
 
 // ---------- defaults
 const DEFAULTS = {
-  apiBase: "https://cogmyra-api.onrender.com",
+  apiBase: "https://cogmyra-proxy.cogmyra.workers.dev",
   model: "gpt-4o-mini",
   sessionId: LS.get("cm.sessionId") || (crypto?.randomUUID?.() ?? String(Date.now())),
 };

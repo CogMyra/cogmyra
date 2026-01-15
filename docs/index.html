@@ -1,98 +1,43 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-
-  <title>CogMyra — Your Personalized AI Learning Coach</title>
-  <link rel="stylesheet" href="/site.css">
-
-  <!-- Favicon -->
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="/favicon.svg" />
-  <meta name="theme-color" content="#0b1220" />
-
-  <!-- Canonical -->
-  <link rel="canonical" href="https://cogmyra.com/">
-
-  <!-- Description -->
-  <meta name="description" content="CogMyra helps you learn faster with clear explanations, practice, and feedback that adapts to you.">
-
-  <!-- Open Graph -->
-  <meta property="og:title" content="CogMyra — Your Personalized AI Learning Coach" />
-  <meta property="og:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://cogmyra.com/" />
-  <meta property="og:image" content="https://cogmyra.com/og-home-1200x630.jpg" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="CogMyra — Your Personalized AI Learning Coach" />
-  <meta name="twitter:description" content="Learn faster with clear explanations, practice, and feedback that adapts to you." />
-  <meta name="twitter:image" content="https://cogmyra.com/og-home-1200x630.jpg" />
-
-  <!-- Load shared header -->
-  <script>
-    (async () => {
-      try {
-        const r = await fetch('/header.html?v={{REV}}', { cache: 'no-cache' });
-        if (!r.ok) return;
-        const html = await r.text();
-        if (html.includes('<h1>404')) return;
-        document.body.insertAdjacentHTML('afterbegin', html);
-      } catch {}
-    })();
-  </script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CogMyra — Live Demos</title>
+  <style>
+    body{margin:0;background:#0b1220;color:#e6e9f2;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif}
+    .wrap{max-width:900px;margin:6rem auto;padding:0 1.25rem}
+    h1{font-size:2rem;margin:0 0 1rem}
+    p{opacity:.85;line-height:1.5}
+    .badges{margin:.75rem 0 2rem}
+    .badge{display:inline-block;background:#111a33;border:1px solid #1f2a48;border-radius:999px;padding:.25rem .75rem;margin-right:.5rem;font-size:.85rem}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.25rem}
+    a.card{display:block;text-decoration:none;color:inherit;background:#0e1830;border:1px solid #1e2b52;border-radius:16px;padding:1rem}
+    a.card:hover{border-color:#315fff;box-shadow:0 0 0 3px rgba(49,95,255,.15)}
+    .title{font-weight:600;margin:0 0 .25rem}
+    .desc{opacity:.8;font-size:.95rem;margin:0}
+    footer{opacity:.7;margin-top:2.5rem;font-size:.9rem}
+  </style>
 </head>
 <body>
-  <main class="container">
-    <div class="row" style="align-items:center;gap:28px">
-      <section>
-        <span class="badge">Learning, faster</span>
-        <h1>Your Personalized AI<br/>Learning Coach</h1>
-        <p class="lead">
-          CogMyra helps you learn faster with clear explanations,
-          practice, and feedback that adapts to you. Sign in with a magic link
-          and start chatting with your guide in seconds.
-        </p>
-        <div style="display:flex;gap:12px;margin-top:14px">
-          <a class="btn" href="/guide/">Try the Guide</a>
-          <a class="btn secondary" href="#how">How it works →</a>
-        </div>
-        <p class="small" style="margin-top:10px">
-          API Base: <code>https://cogmyra-api.onrender.com</code>
-        </p>
-      </section>
-
-      <aside class="card">
-        <div class="small" style="opacity:.8;margin-bottom:6px">Preview</div>
-        <div class="card" style="margin-bottom:10px">
-          <b>You</b><br/>Explain photosynthesis like I’m 12.
-        </div>
-        <div class="card">
-          <b>CogMyra</b><br/>Think of leaves as tiny solar panels. They take in sunlight, water, and carbon dioxide and turn that into food for the plant and oxygen for us…
-        </div>
-      </aside>
+  <main class="wrap">
+    <h1>CogMyra Demo Pages</h1>
+    <div class="badges">
+      <span class="badge">api-v5.7.4-gpt5-tempfix2</span>
+      <span class="badge">GitHub Pages</span>
     </div>
-
-    <section id="how" style="margin-top:36px">
-      <div class="grid3">
-        <div class="card">
-          <b>Fast sign-in</b><br/>
-          <span class="small">Passwordless magic link—just your email.</span>
-        </div>
-        <div class="card">
-          <b>Personalized help</b><br/>
-          <span class="small">A guide that adapts to your level.</span>
-        </div>
-        <div class="card">
-          <b>Built for learning</b><br/>
-          <span class="small">Explanations, practice, and feedback—saved to your account.</span>
-        </div>
-      </div>
+    <p>Select a demo to open:</p>
+    <section class="grid">
+      <a class="card" href="./chat-demo.html">
+        <div class="title">Chat Demo</div>
+        <p class="desc">Simple UI that sends POST <code>https://cogmyra-proxy.cogmyra.workers.dev/api/chat</code> using your X-Api-Key.</p>
+      </a>
+      <a class="card" href="./stream-test.html">
+        <div class="title">Stream Test</div>
+        <p class="desc">SSE streaming via <code>https://cogmyra-proxy.cogmyra.workers.dev/api/chat</code> with <code>stream:true</code>.</p>
+      </a>
     </section>
+    <footer>© CogMyra</footer>
   </main>
 </body>
 </html>

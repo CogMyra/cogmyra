@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE="https://cogmyra-api.onrender.com"
+BASE="https://cogmyra-proxy.cogmyra.workers.dev"
 PATHS=( "/api/admin/export.csv" "/api/admin/export" )
 HEADERS_VARIANTS=(
   "x-admin-key:%s"

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-BASE="https://cogmyra-api.onrender.com"
+BASE="https://cogmyra-proxy.cogmyra.workers.dev"
 UA="cogmyra-export/discover-1.0"
 
 # Get key from env or Keychain (trim CR/LF)
